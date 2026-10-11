@@ -825,7 +825,7 @@ function blankState() {
 /* ---------------- En ligne : Supabase (compte, synchro, fichiers, espaces clients) ---------------- */
 const URL_TTL = 60 * 60 * 24 * 14;
 const Cloud = {
-  ready: false, status: 'local', BUCKET: 'media', busy: false, again: false, pushT: null, signed: {}, lastPub: {}, channel: null,
+  ready: false, status: 'local', BUCKET: 'valideo-media', busy: false, again: false, pushT: null, signed: {}, lastPub: {}, channel: null,
   init() { if (CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase) { sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey); this.ready = true; } },
   setStatus(s) { this.status = s; const el = $('#sync'); if (el) el.innerHTML = syncChip(); },
   async start() {

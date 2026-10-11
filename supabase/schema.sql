@@ -80,18 +80,18 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- 6. Stockage privé des médias et preuves de paiement (dossier = id du monteur)
-insert into storage.buckets (id, name, public) values ('media', 'media', false)
+insert into storage.buckets (id, name, public) values ('valideo-media', 'valideo-media', false)
 on conflict (id) do nothing;
 
 drop policy if exists "media lecture proprietaire" on storage.objects;
 create policy "media lecture proprietaire" on storage.objects for select to authenticated
-  using (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'valideo-media' and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists "media ajout proprietaire" on storage.objects;
 create policy "media ajout proprietaire" on storage.objects for insert to authenticated
-  with check (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'valideo-media' and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists "media modif proprietaire" on storage.objects;
 create policy "media modif proprietaire" on storage.objects for update to authenticated
-  using (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'valideo-media' and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists "media suppression proprietaire" on storage.objects;
 create policy "media suppression proprietaire" on storage.objects for delete to authenticated
-  using (bucket_id = 'media' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'valideo-media' and (storage.foldername(name))[1] = auth.uid()::text);
