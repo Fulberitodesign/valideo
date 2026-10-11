@@ -254,7 +254,7 @@ function pDashboard() {
   S.invoices.forEach(i => { if (!isSent(i)) return; const t = totals(i); toCollect += t.due; if (invStatus(i) === 'retard') { late += t.due; lateN++; } (i.payments || []).forEach(p => { if (p.date.slice(0, 7) === mo) month += +p.amount; }); });
   const active = S.projects.filter(p => p.status !== 'termine').sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
   const recent = S.activity.slice(0, 6);
-  return `${S.settings.sample ? `<div class="banner"><span>Vous découvrez Validéo avec des <b>données d'exemple</b>. Essayez « Afficher en tant que » en bas du menu pour voir l'espace d'un client.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
+  return `${S.settings.sample ? `<div class="banner"><span>Vous découvrez Validéo avec des <b>données d'exemple</b>. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
   <div class="ph"><div><div class="eyebrow">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour ${esc((S.settings.owner || '').split(' ')[0])}</h1></div>
   <div class="row"><button class="btn" onclick="App.editClient()">Nouveau client</button><button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
   <div class="kpis">${kpi('Projets en cours', active.length, `${S.projects.filter(p => p.status === 'termine').length} terminés`)}${kpi('À encaisser', fmt(toCollect), 'factures envoyées')}${kpi('En retard', fmt(late), `${lateN} facture${lateN > 1 ? 's' : ''}`, late ? 'bad' : '')}${kpi('Encaissé ce mois', fmt(month), new Date().toLocaleDateString('fr-FR', { month: 'long' }), 'ok')}</div>
@@ -1034,10 +1034,22 @@ async function seed() {
   return s;
 }
 
+/* Liens directs : #/factures… ex. #/invoices, #/project/0, #/as/0/media/0 (index ou identifiant) */
+function applyHash() {
+  const parts = decodeURIComponent(location.hash).replace(/^#\/?/, '').split('/').filter(Boolean); if (!parts.length) return false;
+  const pick = (list, v) => /^\d+$/.test(v) ? list[+v]?.id : v;
+  if (parts[0] === 'as') { const cid = pick(S.clients, parts[1]); view = client(cid) ? { as: 'client', clientId: cid } : { as: 'me' }; parts.splice(0, 2); }
+  else if (parts[0] !== 'me') view = { as: 'me' }; else parts.shift();
+  const lists = { client: S.clients, project: S.projects, media: S.media, invoice: S.invoices };
+  const page = parts[0] || (isOwner() ? 'dashboard' : 'client');
+  route = { page, id: parts[1] ? pick(lists[page] || [], parts[1]) : (page === 'client' && !isOwner() ? view.clientId : null) };
+  return true;
+}
 async function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   Cloud.init();
   PORTAL_TOKEN = new URLSearchParams(location.search).get('portail');
+  if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
   if (PORTAL_TOKEN) {
     MODE = 'portal'; document.body.classList.add('portal');
     if (!Cloud.ready) { $('#main').innerHTML = '<div class="loading">Espace client indisponible pour le moment.</div>'; return; }
@@ -1051,7 +1063,8 @@ async function init() {
   if (!st) { st = await seed(); await DB.put('kv', 'state', st).catch(() => {}); }
   S = migrate(st);
   try { const v = JSON.parse(localStorage.getItem('valideo-view')); if (v && (v.as === 'me' || client(v.clientId))) view = v; } catch (e) {}
-  if (!isOwner()) route = { page: 'client', id: view.clientId };
+  if (!applyHash() && !isOwner()) route = { page: 'client', id: view.clientId };
+  addEventListener('hashchange', () => { if (applyHash()) render(); });
   render(); purgeExpired(); setInterval(purgeExpired, 36e5);
   Cloud.start();
 }

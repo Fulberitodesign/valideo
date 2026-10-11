@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guide d'utilisation · Validéo</title>
+<meta name="description" content="Le guide complet de Validéo, de A à Z : réglages, clients, projets, validation des étapes, révisions au timecode, espace client, factures, paiements et comptabilité.">
+<meta name="theme-color" content="#070a12">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+.g-hero{padding-block:56px 32px}
+.g-hero .wrap{display:flex;flex-direction:column;gap:14px;max-width:1160px}
+.g-hero h1{font-size:clamp(32px,4.6vw,50px);font-weight:800}
+.g-hero p{color:var(--muted);font-size:18px;max-width:700px}
+.g-meta{display:flex;gap:8px;flex-wrap:wrap}
+.g-meta span{padding:5px 12px;border-radius:999px;font-size:13px;color:var(--muted);border:1px solid var(--line)}
+
+.g-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:48px;align-items:start;padding-bottom:96px}
+.toc{position:sticky;top:84px;border-radius:16px;padding:16px 10px;max-height:calc(100vh - 110px);overflow:auto}
+.toc b{display:block;padding:0 12px 8px;font:600 12px var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+.toc li{counter-increment:t}
+.toc a{display:flex;gap:10px;padding:6px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px;line-height:1.35}
+.toc a::before{content:counter(t,decimal-leading-zero);font:500 12px var(--f-mono);color:var(--dim);padding-top:1px}
+.toc a:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.toc a.on{background:rgba(34,211,238,.1);color:var(--fg)}
+.toc a.on::before{color:var(--accent)}
+@media (max-width:980px){.g-layout{grid-template-columns:minmax(0,1fr)}.toc{position:static;max-height:none}}
+
+.doc{min-width:0;display:flex;flex-direction:column;gap:72px}
+.doc section{scroll-margin-top:84px;display:flex;flex-direction:column;gap:18px}
+.doc .kicker{font:600 12px var(--f-mono);color:var(--accent);letter-spacing:.06em}
+.doc h2{font-size:clamp(24px,2.8vw,32px);font-weight:700}
+.doc h3{font-size:18px;font-weight:600;margin-top:8px}
+.doc p,.doc li{color:#c9d1de;font-size:16px;max-width:72ch}
+.doc strong{color:var(--fg)}
+.doc ol.how{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:12px}
+.doc ol.how li{counter-increment:s;display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:start}
+.doc ol.how li::before{content:counter(s);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--f-display);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04161b}
+.doc ul.dots{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.ui{display:inline-block;padding:1px 8px;border-radius:7px;font:500 14px var(--f-body);background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--fg);white-space:nowrap}
+figure{margin:6px 0 0;display:flex;flex-direction:column;gap:10px}
+figure .shot{padding:6px}
+figcaption{font-size:13.5px;color:var(--dim);padding-left:4px}
+.tip{border-radius:14px;padding:14px 18px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;border-left:3px solid var(--accent)}
+.tip.warn{border-left-color:var(--warn)}
+.tip b{font:700 12px var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding-top:3px}
+.tip.warn b{color:var(--warn)}
+.tip p{color:#c9d1de;font-size:15px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.mini{border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.mini h4{margin:0;font:600 15px var(--f-display)}
+.mini p{font-size:14.5px;color:var(--muted)}
+.tbl-wrap{overflow-x:auto;border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 11.5px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+td{color:#c9d1de}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-ok{background:rgba(74,222,128,.12);color:var(--ok)}.p-warn{background:rgba(251,191,36,.12);color:var(--warn)}.p-bad{background:rgba(248,113,113,.13);color:var(--bad)}.p-info{background:rgba(129,140,248,.14);color:#a5b4fc}.p-n{background:rgba(255,255,255,.06);color:var(--muted)}
+.toplink{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--fg);text-decoration:none;font-size:18px;z-index:20}
+</style>
+</head>
+<body>
+<header class="topnav">
+  <div class="wrap">
+    <a class="logo" href="./"><img src="icon-192.png" alt="" width="30" height="30">Validéo</a>
+    <nav class="links" aria-label="Sections"><a href="./">Accueil</a><a href="#demarrer">Démarrer</a><a href="#factures">Factures</a><a href="#depannage">Dépannage</a></nav>
+    <div class="nav-cta"><a class="btn sm primary" href="app.html">Ouvrir Validéo</a></div>
+  </div>
+</header>
+
+<div class="g-hero"><div class="wrap">
+  <span class="eyebrow">Guide d'utilisation</span>
+  <h1>Maîtriser Validéo, de A à Z</h1>
+  <p>Ce guide suit l'ordre dans lequel tu utiliseras l'outil : les réglages, ton premier client, un projet complet avec ses révisions, puis la facture et le paiement. Chaque écran est illustré.</p>
+  <div class="g-meta"><span>Lecture : 15 min</span><span>17 chapitres</span><span>Captures avec les données d'exemple</span></div>
+</div></div>
+
+<div class="wrap g-layout">
+  <nav class="toc glass" aria-label="Sommaire">
+    <b>Sommaire</b>
+    <ol>
+      <li><a href="#decouvrir">Découvrir l'interface</a></li>
+      <li><a href="#demarrer">Démarrer : exemples et compte</a></li>
+      <li><a href="#identite">Ton identité et tes réglages</a></li>
+      <li><a href="#clients">Ajouter un client</a></li>
+      <li><a href="#projets">Créer un projet</a></li>
+      <li><a href="#etapes">Valider les étapes</a></li>
+      <li><a href="#participants">Participants et alertes</a></li>
+      <li><a href="#revisions">Révisions des médias</a></li>
+      <li><a href="#stockage">Suppression automatique</a></li>
+      <li><a href="#espace-client">L'espace client</a></li>
+      <li><a href="#factures">Factures automatiques</a></li>
+      <li><a href="#modeles">Modèles et identité visuelle</a></li>
+      <li><a href="#paiements">Paiements et relances</a></li>
+      <li><a href="#compta">Comptabilité</a></li>
+      <li><a href="#alertes">Le tableau de bord et ses alertes</a></li>
+      <li><a href="#hors-ligne">Hors ligne, installation, sauvegarde</a></li>
+      <li><a href="#depannage">Questions et dépannage</a></li>
+    </ol>
+  </nav>
+
+  <article class="doc">
+
+    <section id="decouvrir">
+      <span class="kicker">01 · DÉCOUVRIR</span>
+      <h2>Découvrir l'interface</h2>
+      <p>Validéo tient sur un seul écran. À gauche, le <strong>menu</strong> : Tableau de bord, Clients, Projets, Factures, Comptabilité, Identité &amp; réglages. Les pastilles orange indiquent ce qui demande ton attention.</p>
+      <p>En haut, trois repères :</p>
+      <ul class="dots">
+        <li><span class="ui">? Guide d'utilisation</span> ouvre ce guide.</li>
+        <li>L'<strong>état de synchronisation</strong> : <em>Synchronisé</em>, <em>Hors ligne</em> ou <em>Non connecté</em>. Clique dessus pour aller à ton compte.</li>
+        <li>Le sélecteur <span class="ui">Affichage</span> : <em>Ma vue (monteur)</em> ou la vue d'un client, pour voir exactement ce qu'il voit.</li>
+      </ul>
+      <figure><div class="shot glass"><img src="guide/img/dashboard.png" alt="Tableau de bord de Validéo" loading="lazy" width="1440" height="900"></div><figcaption>Le tableau de bord : chiffres clés, éléments « À traiter », projets en cours et dernières activités.</figcaption></figure>
+    </section>
+
+    <section id="demarrer">
+      <span class="kicker">02 · DÉMARRER</span>
+      <h2>Démarrer : exemples et compte en ligne</h2>
+      <p>À la première ouverture, Validéo contient des <strong>données d'exemple</strong> (trois clients, cinq projets, trois factures) pour que tu puisses tout essayer sans risque.</p>
+      <ol class="how">
+        <li><p>Explore librement : valide une étape, ajoute un commentaire, ouvre une facture.</p></li>
+        <li><p>Quand tu es prêt, clique sur <span class="ui">Effacer les exemples et commencer</span> dans le bandeau bleu du tableau de bord.</p></li>
+        <li><p>Va dans <span class="ui">Identité &amp; réglages</span> → <strong>Compte en ligne</strong>, puis <span class="ui">Créer mon compte</span> avec ton email et un mot de passe d'au moins 8 caractères.</p></li>
+        <li><p>Confirme ton adresse grâce à l'email reçu, puis <span class="ui">Se connecter</span>. La pastille du haut passe à <em>Synchronisé</em>.</p></li>
+      </ol>
+      <div class="tip glass"><b>Bon à savoir</b><p>Sans compte, tout fonctionne quand même, mais uniquement sur cet appareil. Le compte en ligne sert à retrouver tes données partout et à donner un lien à tes clients.</p></div>
+    </section>
+
+    <section id="identite">
+      <span class="kicker">03 · RÉGLAGES</span>
+      <h2>Ton identité et tes réglages</h2>
+      <p>Tout ce que tu remplis ici apparaît sur tes factures. L'aperçu à droite se met à jour pendant que tu tapes.</p>
+      <div class="grid2">
+        <div class="mini glass"><h4>Ton entreprise</h4><p>Nom commercial, ton nom, email, téléphone/WhatsApp, adresse, numéro SIRET, RCCM ou NIF, coordonnées de paiement (IBAN, Mobile Money…), mentions légales.</p></div>
+        <div class="mini glass"><h4>Facturation</h4><p>Devise (€, FCFA, $…), TVA par défaut, délai de paiement, préfixe et prochain numéro de facture, texte des pénalités de retard.</p></div>
+        <div class="mini glass"><h4>Identité visuelle</h4><p>Logo ou photo, couleur de marque (pastilles ou couleur libre), modèle de facture parmi six.</p></div>
+        <div class="mini glass"><h4>Signature et cachet</h4><p>Signe à la souris ou au doigt, ou importe une image. Le cachet rond est généré avec tes textes et ta couleur.</p></div>
+      </div>
+      <figure><div class="shot glass"><img src="guide/img/settings.png" alt="Page Identité et réglages avec aperçu de facture" loading="lazy" width="1440" height="1500"></div><figcaption>Identité &amp; réglages : à gauche les champs, à droite l'aperçu de la facture en direct.</figcaption></figure>
+    </section>
+
+    <section id="clients">
+      <span class="kicker">04 · CLIENTS</span>
+      <h2>Ajouter un client</h2>
+      <ol class="how">
+        <li><p>Menu <span class="ui">Clients</span> → <span class="ui">Nouveau client</span>.</p></li>
+        <li><p>Renseigne le nom du contact, l'entreprise (facultative), l'email et le numéro <strong>WhatsApp avec l'indicatif</strong> (ex. +221 77 123 45 67), puis l'adresse de facturation.</p></li>
+        <li><p>Ajoute des notes privées si besoin : le client ne les voit jamais.</p></li>
+      </ol>
+      <p>La liste des clients s'affiche en <strong>grille</strong> ou en <strong>liste</strong> : utilise les deux petites icônes à côté du bouton. Le même choix existe pour les projets et les factures.</p>
+      <figure><div class="shot glass"><img src="guide/img/clients.png" alt="Liste des clients en grille" loading="lazy" width="1440" height="760"></div><figcaption>Chaque carte montre les projets en cours, le montant total et les impayés du client.</figcaption></figure>
+      <p>En ouvrant un client, tu obtiens <strong>son tableau de bord</strong> : ses projets, le montant total, ce qui est payé, les impayés, ses factures et le lien de son espace en ligne.</p>
+      <figure><div class="shot glass"><img src="guide/img/client.png" alt="Fiche client avec chiffres, projets et factures" loading="lazy" width="1440" height="1000"></div><figcaption>La fiche d'un client.</figcaption></figure>
+    </section>
+
+    <section id="projets">
+      <span class="kicker">05 · PROJETS</span>
+      <h2>Créer un projet</h2>
+      <ol class="how">
+        <li><p><span class="ui">Nouveau projet</span> depuis le tableau de bord, la page Projets ou la fiche du client.</p></li>
+        <li><p>Donne un titre, choisis le client, indique le <strong>montant HT</strong> et la <strong>date de livraison</strong>.</p></li>
+        <li><p>Vérifie les étapes, une par ligne. Par défaut : Brief &amp; devis validés, Dérushage, Montage V1, Retours client, Corrections / V2, Étalonnage &amp; mixage, Livraison des fichiers. Adapte-les à ton projet.</p></li>
+      </ol>
+      <figure><div class="shot glass"><img src="guide/img/projects.png" alt="Liste des projets avec avancement et échéances" loading="lazy" width="1440" height="800"></div><figcaption>Les projets avec leur avancement et leur échéance : <em>J-3</em> en orange, <em>Délai dépassé</em> en rouge.</figcaption></figure>
+      <div class="tip glass"><b>Astuce</b><p>Besoin d'un acompte ? Dans la page du projet, carte Facturation, clique sur <span class="ui">Acompte</span> : une facture de 30 % est préparée. Il sera déduit automatiquement de la facture finale.</p></div>
+    </section>
+
+    <section id="etapes">
+      <span class="kicker">06 · VALIDATION</span>
+      <h2>Valider les étapes</h2>
+      <p>Une étape n'est terminée que lorsqu'elle est <strong>validée des deux côtés</strong>. La barre d'avancement en tient compte : une validation sur deux compte pour moitié.</p>
+      <div class="grid2">
+        <div class="mini glass"><h4>De ton côté</h4><p>Coche <span class="ui">Moi</span> quand l'étape est faite. Si le client t'a dit « c'est bon » par message, tu peux aussi cocher <span class="ui">Client</span> pour lui.</p></div>
+        <div class="mini glass"><h4>Du côté du client</h4><p>Il ne voit pas de cases à cocher : il voit l'état de l'étape et un bouton <span class="ui">Valider l'étape</span>, mis en avant quand l'étape est prête.</p></div>
+      </div>
+      <figure><div class="shot glass"><img src="guide/img/project.png" alt="Page projet côté monteur avec les étapes et les cases Moi et Client" loading="lazy" width="1440" height="1000"></div><figcaption>Côté monteur : chaque étape a ses deux validations, sa date, et peut être renommée ou supprimée.</figcaption></figure>
+      <p>Après chaque validation, un message propose <span class="ui">Prévenir</span> : il prépare l'alerte d'avancement pour les participants.</p>
+      <div class="tip glass"><b>Automatique</b><p>Dès que la dernière étape est validée des deux côtés, le projet passe en <strong>Terminé</strong> et sa <strong>facture finale est générée</strong>, à vérifier (voir chapitre 11).</p></div>
+    </section>
+
+    <section id="participants">
+      <span class="kicker">07 · ALERTES</span>
+      <h2>Participants et alertes email / WhatsApp</h2>
+      <p>Dans un projet, carte <strong>Participants</strong>, ajoute les personnes qui suivent le projet avec le client : directrice artistique, chargé de com, producteur… avec leur email et/ou leur WhatsApp.</p>
+      <ol class="how">
+        <li><p>Clique sur <span class="ui">Prévenir les participants</span>. Le message d'avancement est déjà rédigé : pourcentage, étapes terminées, prochaine étape, date de livraison, et le lien de l'espace client si tu es connecté.</p></li>
+        <li><p>Modifie le texte si tu veux.</p></li>
+        <li><p>Clique sur <span class="ui">Email</span> ou <span class="ui">WhatsApp</span> à côté de chaque personne : ta messagerie ou WhatsApp s'ouvre avec le message prêt. Il ne reste qu'à envoyer.</p></li>
+      </ol>
+      <div class="tip glass warn"><b>Important</b><p>Validéo prépare les messages mais ne les envoie pas à ta place : c'est toi qui appuies sur Envoyer dans ta messagerie ou dans WhatsApp.</p></div>
+    </section>
+
+    <section id="revisions">
+      <span class="kicker">08 · RÉVISIONS</span>
+      <h2>Révisions des médias : commenter, corriger, renvoyer</h2>
+      <h3>Importer un média</h3>
+      <p>Dans un projet, carte <strong>Médias en révision</strong> → <span class="ui">Importer un fichier</span>. Vidéos, sons et images sont acceptés. Le média devient la <strong>V1</strong>.</p>
+      <h3>Commenter au bon endroit</h3>
+      <ul class="dots">
+        <li><strong>Vidéo ou son :</strong> lance la lecture, puis clique dans la zone de commentaire. La lecture se met en pause et le commentaire est attaché à cet instant, au format <span class="mono">HH:MM:SS:II</span> (25 images/seconde). Des repères apparaissent sur la barre sous le lecteur.</li>
+        <li><strong>Image :</strong> clique à l'endroit précis sur l'image. Un point orange apparaît, puis écris ta remarque. Chaque point est numéroté.</li>
+      </ul>
+      <figure><div class="shot glass"><img src="guide/img/media.png" alt="Révision d'une image avec trois points commentés" loading="lazy" width="1440" height="900"></div><figcaption>Cliquer sur un commentaire ou sur un repère te place au bon instant ou fait clignoter le bon point.</figcaption></figure>
+      <h3>Corriger et envoyer une nouvelle version</h3>
+      <ol class="how">
+        <li><p>Corrige dans ton logiciel de montage, puis clique sur <span class="ui">Marquer corrigé</span> pour chaque commentaire traité.</p></li>
+        <li><p>Clique sur <span class="ui">Envoyer une nouvelle version</span> et choisis le fichier : il devient la V2. Le sélecteur <span class="ui">Version</span> permet de revoir les versions précédentes et leurs commentaires.</p></li>
+        <li><p>Clique sur <span class="ui">Prévenir</span> dans la notification : le message indique le nombre de corrections intégrées.</p></li>
+      </ol>
+      <h3>Valider une version</h3>
+      <p>Quand plus rien n'est à corriger, le client clique sur <span class="ui">Valider la V2</span>. Tu peux aussi <span class="ui">Marquer V2 validée</span> s'il t'a confirmé par message.</p>
+    </section>
+
+    <section id="stockage">
+      <span class="kicker">09 · STOCKAGE</span>
+      <h2>Suppression automatique des médias</h2>
+      <p>Pour garder de la place, les fichiers d'un média, <strong>de la V1 à la version finale</strong>, sont supprimés un certain nombre de jours après sa validation, sur ton appareil comme en ligne.</p>
+      <ul class="dots">
+        <li>Choisis le délai dans <span class="ui">Identité &amp; réglages</span> → <strong>Stockage des médias</strong> : 1, 3, 7, 14, 30 ou 60 jours, ou <em>Ne jamais supprimer</em>.</li>
+        <li>La date de suppression s'affiche sur le média validé, et une alerte apparaît 2 jours avant.</li>
+        <li>Les <strong>commentaires et l'historique restent consultables</strong>.</li>
+      </ul>
+      <div class="tip glass warn"><b>Attention</b><p>Garde toujours tes fichiers sources et tes exports finaux sur ton disque : Validéo sert à la relecture, pas à l'archivage.</p></div>
+    </section>
+
+    <section id="espace-client">
+      <span class="kicker">10 · ESPACE CLIENT</span>
+      <h2>L'espace client</h2>
+      <p>Chaque client dispose d'un <strong>lien privé</strong> vers son espace, sans création de compte. Il y voit ses projets, l'avancement, les médias à relire et ses factures envoyées.</p>
+      <ol class="how">
+        <li><p>Connecte-toi à ton compte en ligne : les liens sont créés à la synchronisation.</p></li>
+        <li><p>Ouvre la fiche du client, carte <strong>Espace client en ligne</strong>.</p></li>
+        <li><p><span class="ui">Copier le lien</span> ou <span class="ui">Envoyer au client</span> par email ou WhatsApp.</p></li>
+      </ol>
+      <figure><div class="shot glass"><img src="guide/img/client-home.png" alt="Accueil de l'espace client" loading="lazy" width="1440" height="900"></div><figcaption>L'accueil de l'espace client : ses projets, ses montants, ce qui est payé et ce qui reste dû.</figcaption></figure>
+      <figure><div class="shot glass"><img src="guide/img/client-project.png" alt="Projet vu par le client avec boutons Valider l'étape" loading="lazy" width="1440" height="950"></div><figcaption>Un projet côté client : l'étape prête à valider est mise en avant.</figcaption></figure>
+      <p>Ses validations et ses commentaires t'arrivent dès que ton application est ouverte, avec une notification et une alerte sur ton tableau de bord.</p>
+      <div class="tip glass"><b>Astuce</b><p>Pour voir exactement ce que voit ton client, choisis son nom dans le sélecteur <span class="ui">Affichage</span> en haut à droite. Reviens avec <em>Ma vue (monteur)</em>.</p></div>
+      <figure><div class="shot glass"><img src="guide/img/client-media.png" alt="Révision d'un média côté client" loading="lazy" width="1440" height="900"></div><figcaption>Le client commente et valide la version depuis son espace.</figcaption></figure>
+    </section>
+
+    <section id="factures">
+      <span class="kicker">11 · FACTURES</span>
+      <h2>Factures automatiques : vérifier, ajuster, envoyer</h2>
+      <p>À la fin d'un projet, la facture finale est créée avec le statut <span class="pill p-warn">À vérifier</span>. Son montant reprend celui du projet, <strong>acomptes déjà facturés déduits</strong>. Rien ne part sans ta validation.</p>
+      <ol class="how">
+        <li><p>Ouvre-la depuis l'alerte du tableau de bord ou le menu <span class="ui">Factures</span>.</p></li>
+        <li><p>Applique une <strong>remise</strong> en % ou en montant, puis <span class="ui">Appliquer</span>. Ou clique sur <span class="ui">Modifier les lignes</span> pour changer les désignations, les quantités, la TVA ou la note.</p></li>
+        <li><p>Clique sur <span class="ui">Valider et envoyer</span>. Le message au client est prêt avec le montant, l'échéance et tes coordonnées de paiement.</p></li>
+        <li><p>Pour joindre le PDF : <span class="ui">Imprimer / enregistrer en PDF</span>, choisis « Enregistrer au format PDF », puis ajoute le fichier à ton message.</p></li>
+      </ol>
+      <figure><div class="shot glass"><img src="guide/img/invoice.png" alt="Facture à vérifier avec remise et bouton Valider et envoyer" loading="lazy" width="1680" height="1150"></div><figcaption>Une facture générée automatiquement, en attente de vérification.</figcaption></figure>
+      <h3>Les statuts d'une facture</h3>
+      <div class="tbl-wrap glass"><table>
+        <thead><tr><th>Statut</th><th>Signification</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-n">Brouillon</span></td><td>Créée à la main, pas encore envoyée.</td></tr>
+          <tr><td><span class="pill p-warn">À vérifier</span></td><td>Générée à la fin d'un projet, en attente de ta validation.</td></tr>
+          <tr><td><span class="pill p-info">Envoyée</span></td><td>Validée, en attente de paiement avant l'échéance.</td></tr>
+          <tr><td><span class="pill p-info">Paiement partiel</span></td><td>Une partie est réglée, le reste est dû.</td></tr>
+          <tr><td><span class="pill p-bad">En retard</span></td><td>L'échéance est dépassée et il reste un montant dû.</td></tr>
+          <tr><td><span class="pill p-ok">Payée</span></td><td>Entièrement réglée. Un tampon « PAYÉE » apparaît sur le document.</td></tr>
+        </tbody></table></div>
+      <figure><div class="shot glass"><img src="guide/img/invoices.png" alt="Liste des factures avec filtres par statut" loading="lazy" width="1440" height="700"></div><figcaption>Le menu Factures, filtrable par statut, en liste ou en grille.</figcaption></figure>
+    </section>
+
+    <section id="modeles">
+      <span class="kicker">12 · MODÈLES</span>
+      <h2>Modèles de facture et identité visuelle</h2>
+      <p>Six modèles sont disponibles. Ils reprennent tous ton logo, ta couleur, ta signature et ton cachet.</p>
+      <div class="tbl-wrap glass"><table>
+        <thead><tr><th>Modèle</th><th>Style</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Moderne</strong></td><td>En-tête plein à ta couleur, texte blanc.</td></tr>
+          <tr><td><strong>Classique</strong></td><td>Typographie à empattements, tableau encadré, double filet.</td></tr>
+          <tr><td><strong>Épuré</strong></td><td>Grand titre fin, lignes discrètes, beaucoup d'air.</td></tr>
+          <tr><td><strong>Bande latérale</strong></td><td>Colonne de couleur sur le côté, total dans un bloc plein.</td></tr>
+          <tr><td><strong>Prestige</strong></td><td>En-tête sombre souligné de ta couleur, titres élégants.</td></tr>
+          <tr><td><strong>Encadré</strong></td><td>Blocs teintés, lignes alternées, total en carte.</td></tr>
+        </tbody></table></div>
+      <p>Le modèle par défaut se choisit dans <span class="ui">Identité &amp; réglages</span>. Tu peux aussi en changer pour une seule facture, carte <strong>Apparence</strong> de la facture.</p>
+    </section>
+
+    <section id="paiements">
+      <span class="kicker">13 · PAIEMENTS</span>
+      <h2>Paiements, preuves et relances</h2>
+      <h3>Enregistrer un paiement</h3>
+      <ol class="how">
+        <li><p>Sur la facture, <span class="ui">Enregistrer un paiement</span>.</p></li>
+        <li><p>Indique la date, le montant (le reste dû est proposé), le mode de paiement (virement, Mobile Money, espèces, carte, chèque, PayPal) et la référence.</p></li>
+        <li><p>Joins la <strong>preuve de paiement</strong> : capture, reçu ou PDF. Elle reste consultable dans la facture et la comptabilité.</p></li>
+      </ol>
+      <p>Un paiement partiel est accepté : la facture passe en <span class="pill p-info">Paiement partiel</span> jusqu'au solde.</p>
+      <h3>Relancer un client</h3>
+      <p>Bouton <span class="ui">Relancer</span> sur la facture, dans la comptabilité ou dans l'alerte du tableau de bord. Le message est poli et précis : numéro, échéance, nombre de jours de retard, montant restant et coordonnées de paiement. La date de chaque relance est enregistrée.</p>
+    </section>
+
+    <section id="compta">
+      <span class="kicker">14 · COMPTABILITÉ</span>
+      <h2>Comptabilité</h2>
+      <ul class="dots">
+        <li><strong>Chiffres de l'année :</strong> encaissé (dont ce mois), créances, montant en retard, dépenses et résultat.</li>
+        <li><strong>Graphique sur 12 mois :</strong> encaissements et dépenses mois par mois.</li>
+        <li><strong>Créances et impayés :</strong> chaque facture ouverte avec ses jours de retard et des boutons Paiement et Relancer.</li>
+        <li><strong>Entrées :</strong> tous les paiements reçus, avec le mode, la référence et la preuve.</li>
+        <li><strong>Dépenses :</strong> logiciels, matériel, musique, déplacements… avec <span class="ui">Ajouter une dépense</span>.</li>
+      </ul>
+      <figure><div class="shot glass"><img src="guide/img/accounting.png" alt="Page Comptabilité" loading="lazy" width="1440" height="1300"></div><figcaption>La comptabilité. <span class="ui">Exporter pour le comptable (CSV)</span> produit un fichier lisible dans Excel.</figcaption></figure>
+    </section>
+
+    <section id="alertes">
+      <span class="kicker">15 · ALERTES</span>
+      <h2>Le tableau de bord et ses alertes</h2>
+      <p>La carte <strong>À traiter</strong> rassemble tout ce qui demande une action, du plus urgent au moins urgent :</p>
+      <div class="tbl-wrap glass"><table>
+        <thead><tr><th>Alerte</th><th>Quand</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-bad">Impayée</span></td><td>Échéance dépassée</td><td>Relancer</td></tr>
+          <tr><td><span class="pill p-bad">Délai dépassé</span></td><td>Date de livraison passée, projet non terminé</td><td>Ouvrir le projet</td></tr>
+          <tr><td><span class="pill p-warn">À vérifier</span></td><td>Facture générée en fin de projet</td><td>Vérifier</td></tr>
+          <tr><td><span class="pill p-warn">Livraison proche</span></td><td>3 jours ou moins avant la livraison</td><td>Ouvrir</td></tr>
+          <tr><td><span class="pill p-info">Échéance proche</span></td><td>5 jours ou moins avant l'échéance d'une facture</td><td>Voir</td></tr>
+          <tr><td><span class="pill p-info">Validation client</span></td><td>Le client a validé une étape que tu n'as pas encore cochée</td><td>Confirmer</td></tr>
+          <tr><td><span class="pill p-info">Retours client</span></td><td>Commentaires non traités sur un média</td><td>Ouvrir</td></tr>
+          <tr><td><span class="pill p-info">Suppression proche</span></td><td>Les fichiers d'un média validé seront supprimés sous 2 jours</td><td>Voir</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <section id="hors-ligne">
+      <span class="kicker">16 · HORS LIGNE</span>
+      <h2>Hors ligne, installation et sauvegarde</h2>
+      <div class="grid2">
+        <div class="mini glass"><h4>Hors ligne</h4><p>Après une première visite, Validéo s'ouvre et fonctionne sans connexion. Tes modifications sont envoyées en ligne au retour du réseau.</p></div>
+        <div class="mini glass"><h4>Installer l'application</h4><p>Sur ordinateur (Chrome, Edge), utilise l'icône d'installation dans la barre d'adresse. Sur téléphone : menu du navigateur → « Ajouter à l'écran d'accueil ».</p></div>
+        <div class="mini glass"><h4>Sauvegarde</h4><p><span class="ui">Identité &amp; réglages</span> → <span class="ui">Exporter une sauvegarde</span> : un fichier qui contient tout, fichiers compris. <span class="ui">Restaurer une sauvegarde</span> pour le recharger.</p></div>
+        <div class="mini glass"><h4>Plusieurs appareils</h4><p>Connecte-toi avec le même compte : ordinateur et téléphone partagent les mêmes projets.</p></div>
+      </div>
+    </section>
+
+    <section id="depannage">
+      <span class="kicker">17 · DÉPANNAGE</span>
+      <h2>Questions et dépannage</h2>
+      <div class="tbl-wrap glass"><table>
+        <thead><tr><th>Situation</th><th>Solution</th></tr></thead>
+        <tbody>
+          <tr><td>Un fichier reste « sur cet appareil »</td><td>Il dépasse 50 Mo. Exporte une version de relecture plus légère (720p, H.264) et envoie-la comme nouvelle version.</td></tr>
+          <tr><td>La pastille indique « Erreur de synchro »</td><td>Vérifie ta connexion, puis clique dessus et choisis <span class="ui">Synchroniser maintenant</span>.</td></tr>
+          <tr><td>Le client ne voit pas son lien</td><td>Il faut être connecté à ton compte en ligne. Le lien apparaît dans la fiche client après la synchronisation.</td></tr>
+          <tr><td>Le bouton WhatsApp ne s'ouvre pas</td><td>Vérifie que le numéro contient l'indicatif du pays (+33, +221, +225…). Sinon, utilise <span class="ui">Copier le message</span>.</td></tr>
+          <tr><td>« Fichier introuvable sur cet appareil »</td><td>Le média a été importé sur un autre appareil hors connexion, ou supprimé. Restaure une sauvegarde ou envoie une nouvelle version.</td></tr>
+          <tr><td>Je veux recommencer de zéro</td><td><span class="ui">Identité &amp; réglages</span> → <span class="ui">Tout effacer</span>. Exporte une sauvegarde avant.</td></tr>
+        </tbody></table></div>
+      <div class="final glass" style="border-radius:20px;padding:36px 24px;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center">
+        <h2 style="font-size:28px">Prêt à suivre ton premier projet ?</h2>
+        <p style="color:var(--muted)">Les données d'exemple sont là pour s'entraîner : essaie chaque chapitre directement dans l'outil.</p>
+        <a class="btn primary" href="app.html">Ouvrir Validéo</a>
+      </div>
+    </section>
+  </article>
+</div>
+
+<a class="toplink glass" href="#" aria-label="Revenir en haut">↑</a>
+<footer class="footer">
+  <div class="wrap"><span>© 2026 Validéo · Guide d'utilisation</span><span><a href="./">Accueil</a><a href="app.html">Ouvrir l'outil</a></span></div>
+</footer>
+<script>
+  // Surligne le chapitre en cours dans le sommaire
+  const links = [...document.querySelectorAll('.toc a')];
+  const byId = Object.fromEntries(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { links.forEach(a => a.classList.remove('on')); byId[e.target.id]?.classList.add('on'); } }), { rootMargin: '-30% 0px -60% 0px' });
+  document.querySelectorAll('.doc section').forEach(s => io.observe(s));
+</script>
+</body>
+</html>

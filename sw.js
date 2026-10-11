@@ -1,6 +1,6 @@
 // Validéo : fonctionnement hors ligne (cache de l'application)
-const CACHE = 'valideo-v2';
-const SHELL = ['./', './index.html', './app.js', './config.js', './manifest.webmanifest', './icon.svg',
+const CACHE = 'valideo-v3';
+const SHELL = ['./', './index.html', './app.html', './guide.html', './app.js', './config.js', './manifest.webmanifest', './icon.svg',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
 
 self.addEventListener('install', e => {
@@ -13,8 +13,8 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co') || u.protocol === 'blob:') return;
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); return r; })
-      .catch(() => caches.match('./index.html')));
+    e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(e.request.url.split('?')[0].split('#')[0], cp)); return r; })
+      .catch(() => caches.match(e.request.url.split('?')[0].split('#')[0]).then(h => h || caches.match('./app.html'))));
     return;
   }
   // Réseau d'abord pour avoir la dernière version, cache si hors ligne

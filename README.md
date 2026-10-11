@@ -11,7 +11,11 @@ Suivi de projets vidéo pour monteurs : étapes validées des deux côtés (mont
 
 | Fichier | Rôle |
 | --- | --- |
-| `index.html` | Interface et styles |
+| `index.html` | Page d'accueil (landing page) |
+| `app.html` | Application : interface et styles |
+| `guide.html`, `guide/img/` | Guide d'utilisation illustré |
+| `site.css` | Styles communs de la landing et du guide |
+| `favicon.ico`, `icon.svg`, `icon-*.png` | Favicon et icônes |
 | `app.js` | Application (local + synchro Supabase + espace client) |
 | `config.js` | URL et clé publique (anon) du projet Supabase |
 | `sw.js`, `manifest.webmanifest` | Mode hors ligne et installation |
