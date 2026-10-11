@@ -58,6 +58,22 @@ let layout = { clients: 'grid', projects: 'list', invoices: 'list' };
 try { Object.assign(layout, JSON.parse(localStorage.getItem('valideo-layout')) || {}); } catch (e) {}
 const viewToggle = k => `<div class="vtoggle" role="group" aria-label="Affichage"><button class="${layout[k] === 'list' ? 'on' : ''}" onclick="App.setLayout('${k}','list')" title="Liste" aria-label="Affichage en liste"><svg viewBox="0 0 16 16"><path d="M2 3.5h12M2 8h12M2 12.5h12"/></svg></button><button class="${layout[k] === 'grid' ? 'on' : ''}" onclick="App.setLayout('${k}','grid')" title="Grille" aria-label="Affichage en grille"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></button></div>`;
 function setLayout(k, v) { layout[k] = v; try { localStorage.setItem('valideo-layout', JSON.stringify(layout)); } catch (e) {} render(); }
+/* Offres : limites appliquées aux comptes connectés (l'administrateur n'a pas de limite) */
+const PLANS = {
+  decouverte: { name: 'Découverte', price: 0, projects: 2, clients: 3 },
+  solo: { name: 'Solo', price: 9, projects: 10, clients: Infinity },
+  pro: { name: 'Pro', price: 19, projects: Infinity, clients: Infinity },
+  studio: { name: 'Studio', price: 39, projects: Infinity, clients: Infinity }
+};
+let profile = null, adminUsers = null;
+const myPlan = () => PLANS[profile?.plan] || PLANS.decouverte;
+function planAllows(kind) {
+  if (!user || !profile || profile.is_admin) return true;
+  const p = myPlan(), n = kind === 'projects' ? S.projects.filter(x => x.status !== 'termine').length : S.clients.length;
+  if (n < p[kind]) return true;
+  toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Voir les offres', () => { location.href = './#offres'; });
+  return false;
+}
 const METHODS = ['Virement', 'Mobile Money', 'Espèces', 'Carte bancaire', 'Chèque', 'PayPal'];
 
 const CFG = window.VALIDEO_CONFIG || {};
@@ -204,6 +220,7 @@ function navHTML() {
   const parent = { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
   const nA = alerts().filter(a => a.lvl !== 'info').length, nV = S.invoices.filter(i => i.status === 'a_verifier').length;
   const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['settings', 'Identité & réglages']];
+  if (profile?.is_admin) items.push(['admin', 'Administration']);
   return items.map(([k, l, n]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
 }
 function render() {
@@ -214,7 +231,7 @@ function render() {
   $('#role').value = isOwner() ? 'me' : view.clientId;
   const r = route; let html;
   if (isOwner()) {
-    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings }[r.page] || pDashboard)(r.id);
+    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin }[r.page] || pDashboard)(r.id);
   } else {
     const cid = view.clientId; let ok = false;
     if (r.page === 'project') ok = proj(r.id)?.clientId === cid;
@@ -482,6 +499,7 @@ function pSettings() {
   const ta = (k, l) => `<label class="field full"><span>${l}</span><textarea id="s-${k}" rows="3" oninput="App.setS('${k}',this.value)">${esc(st[k])}</textarea></label>`;
   return `<div class="ph"><div><h1>Identité & réglages</h1><div class="meta">Vos factures reprennent automatiquement votre logo, vos couleurs, votre signature et votre cachet.</div></div></div>
   <div class="set-layout"><div class="stack">
+  ${user ? "" : accountCard()}
   <section class="card"><h2>Votre entreprise</h2><div class="form">${f('name', 'Nom commercial')}${f('owner', 'Votre nom')}${f('email', 'Email', 'email')}${f('phone', 'Téléphone / WhatsApp', 'tel')}${ta('address', 'Adresse')}${f('siret', 'N° SIRET / RCCM / NIF', 'text', true)}${ta('iban', 'Coordonnées de paiement (IBAN, Mobile Money…)')}${ta('legal', 'Mentions légales en pied de facture')}</div></section>
   <section class="card"><h2>Facturation</h2><div class="form">${f('currency', 'Devise (€, FCFA, $, MAD…)')}${f('tva', 'TVA par défaut (%)', 'number')}${f('payDays', 'Délai de paiement (jours)', 'number')}${f('prefix', 'Préfixe des numéros')}${f('next', 'Prochain numéro', 'number')}${f('penalty', 'Pénalités de retard (texte)')}</div></section>
   <section class="card"><h2>Identité visuelle</h2>
@@ -494,7 +512,7 @@ function pSettings() {
   <section class="card"><h2>Cachet automatique</h2><div class="row" style="align-items:flex-start;gap:18px"><div style="width:130px;color:${esc(st.color)}">${stampSVG(st, st.color)}</div><div class="form" style="flex:1;min-width:220px">${f('stampTop', 'Texte du haut', 'text', true)}${f('stampBottom', 'Texte du bas')}${f('stampCenter', 'Texte central')}<label class="row full" style="gap:8px"><input type="checkbox" ${st.showStamp !== false ? 'checked' : ''} onchange="App.setS('showStamp',this.checked,true)"> Apposer le cachet sur les factures</label></div></div></section>
   <section class="card"><h2>Stockage des médias</h2><p class="hint">Quand le client valide un média, toutes ses versions (V1 jusqu'à la version finale) sont supprimées après ce délai, sur cet appareil et en ligne. Les commentaires et l'historique sont conservés.</p>
     <label class="field"><span>Supprimer les fichiers après validation</span><select id="s-retention" onchange="App.setS('retentionDays',this.value,true)">${[[1, '1 jour'], [3, '3 jours'], [7, '7 jours'], [14, '14 jours'], [30, '30 jours'], [60, '60 jours'], [0, 'Ne jamais supprimer']].map(([v, l]) => `<option value="${v}" ${+st.retentionDays === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></section>
-  ${accountCard()}
+  ${user ? accountCard() : ""}
   <section class="card"><h2>Sauvegarde et données</h2><p class="hint">Tout est enregistré dans ce navigateur, y compris hors ligne. Exportez régulièrement une sauvegarde (fichiers inclus) pour ne rien perdre ou passer sur un autre ordinateur.</p>
     <div class="row"><button class="btn" onclick="App.exportData()">Exporter une sauvegarde</button><label class="btn">Restaurer une sauvegarde<input type="file" hidden accept="application/json,.json" onchange="App.importData(this)"></label><button class="btn ghost danger" onclick="App.askReset()">Tout effacer</button></div></section>
   </div>
@@ -559,6 +577,7 @@ function editClient(id) {
 function saveClient(id) {
   const d = { name: val('f-name').trim(), company: val('f-company').trim(), email: val('f-email').trim(), phone: val('f-phone').trim(), address: val('f-address').trim(), notes: val('f-notes') };
   if (!d.name && !d.company) return toast('Indiquez au moins un nom ou une entreprise.');
+  if (!id && !planAllows('clients')) return;
   if (id) Object.assign(client(id), d); else { id = uid(); S.clients.push({ id, ...d }); }
   save(); closeModal(); go('client', id); toast('Client enregistré');
 }
@@ -586,7 +605,7 @@ function saveProject(id) {
   const d = { title: val('f-title').trim(), clientId: val('f-client'), amount: +val('f-amount') || 0, deadline: val('f-deadline') };
   if (!d.title) return toast('Donnez un titre au projet.');
   if (id) { Object.assign(proj(id), d); log(id, 'Projet modifié'); }
-  else { id = uid(); S.projects.push({ id, ...d, status: 'en_cours', createdAt: today(), collaborators: [], steps: val('f-steps').split('\n').map(s => s.trim()).filter(Boolean).map(label => ({ id: uid(), label, me: false, client: false })) }); log(id, 'Projet créé'); }
+  else { if (!planAllows('projects')) return; id = uid(); S.projects.push({ id, ...d, status: 'en_cours', createdAt: today(), collaborators: [], steps: val('f-steps').split('\n').map(s => s.trim()).filter(Boolean).map(label => ({ id: uid(), label, me: false, client: false })) }); log(id, 'Projet créé'); }
   save(); closeModal(); go('project', id);
 }
 function delProject(id) {
@@ -843,6 +862,7 @@ const Cloud = {
       if (data?.data && !(S.cloud.owner === user.id && S.cloud.dirty)) { S = migrate(data.data); S.cloud.syncedAt = data.updated_at; S.cloud.dirty = false; }
       else if (!data?.data) { if (S.settings.sample) { await DB.clear('files'); S = blankState(); } S.cloud.dirty = true; }
       S.cloud.owner = user.id; await DB.put('kv', 'state', S); render();
+      await loadProfile(); render();
       this.subscribe(); await this.sync();
     } catch (e) { console.warn(e); this.setStatus('error'); }
   },
@@ -976,13 +996,41 @@ async function signIn(create) {
   if (create && !r.data.session) return toast('Compte créé. Confirmez votre adresse via l\'email reçu, puis connectez-vous.');
   toast('Connecté. Synchronisation en cours…');
 }
-async function signOut() { await sb.auth.signOut(); user = null; Cloud.setStatus('local'); render(); toast('Déconnecté. Vos données restent sur cet appareil.'); }
+async function loadProfile() {
+  const { data } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  profile = data || { plan: 'decouverte', is_admin: false };
+}
+function pAdmin() {
+  if (!profile?.is_admin) return nf();
+  if (!adminUsers) { loadAdminUsers(); return '<div class="loading">Chargement des utilisateurs…</div>'; }
+  const t0 = today(), paying = adminUsers.filter(u => !u.is_admin && u.plan !== 'decouverte' && (!u.plan_until || u.plan_until >= t0));
+  const mrr = paying.reduce((a, u) => a + PLANS[u.plan].price, 0);
+  const count = k => adminUsers.filter(u => u.plan === k && !u.is_admin).length;
+  return `<div class="ph"><div><h1>Administration</h1><div class="meta">Utilisateurs de Validéo et leurs offres. Les paiements en ligne seront branchés plus tard : en attendant, active l'offre ici après réception du paiement.</div></div><button class="btn" onclick="App.reloadAdmin()">Actualiser</button></div>
+  <div class="kpis">${kpi('Utilisateurs', adminUsers.length, `${adminUsers.filter(u => u.confirmed).length} emails confirmés`)}${kpi('Abonnés payants', paying.length, `Solo ${count('solo')} · Pro ${count('pro')} · Studio ${count('studio')}`, 'ok')}${kpi('Revenu mensuel', mrr + ' €', 'offres actives')}${kpi('Découverte', count('decouverte'), 'comptes gratuits')}</div>
+  <section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Utilisateur</th><th>Inscription</th><th>Dernière connexion</th><th class="num">Clients</th><th class="num">Projets</th><th>Offre</th><th>Valable jusqu'au</th><th></th></tr></thead><tbody>
+  ${adminUsers.map(u => `<tr><td><b>${esc(u.email)}</b><div class="row" style="margin-top:4px">${u.is_admin ? pill('info', 'Admin') : ''}${u.confirmed ? '' : pill('warn', 'Email non confirmé')}${u.plan_until && u.plan_until < t0 ? pill('bad', 'Offre expirée') : ''}</div></td><td>${fdate(u.created_at.slice(0, 10))}</td><td>${u.last_sign_in_at ? ftime(u.last_sign_in_at) : '—'}</td><td class="num">${u.clients}</td><td class="num">${u.projects}</td>
+  <td><select id="pl-${u.id}" aria-label="Offre de ${esc(u.email)}">${Object.entries(PLANS).map(([k, p]) => `<option value="${k}" ${u.plan === k ? 'selected' : ''}>${p.name}${p.price ? ' · ' + p.price + ' €' : ''}</option>`).join('')}</select></td>
+  <td><input id="pu-${u.id}" type="date" value="${u.plan_until || ''}" aria-label="Fin de l'offre"></td><td><button class="btn sm primary" onclick="App.savePlan('${u.id}')">Enregistrer</button></td></tr>`).join('')}</tbody></table></div></section>`;
+}
+async function loadAdminUsers() {
+  const { data, error } = await sb.rpc('admin_list_users');
+  if (error) { adminUsers = []; toast('Impossible de charger les utilisateurs : ' + error.message); } else adminUsers = data;
+  if (route.page === 'admin') render();
+}
+async function savePlan(uid_) {
+  const plan = val('pl-' + uid_), until = val('pu-' + uid_) || null;
+  const { error } = await sb.rpc('admin_set_plan', { p_user: uid_, p_plan: plan, p_until: until });
+  if (error) return toast('Échec : ' + error.message);
+  toast(`Offre ${PLANS[plan].name} enregistrée`); adminUsers = null; if (uid_ === user.id) await loadProfile(); render();
+}
+async function signOut() { await sb.auth.signOut(); user = null; profile = null; adminUsers = null; Cloud.setStatus('local'); render(); toast('Déconnecté. Vos données restent sur cet appareil.'); }
 const accountCard = () => {
   if (!Cloud.ready) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">La connexion à Supabase n'est pas configurée (fichier config.js). L'outil fonctionne en local sur cet appareil.</p></section>`;
   if (!user) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">Connectez-vous pour retrouver vos données sur tous vos appareils et donner à chaque client un lien vers son espace.</p>
     <div class="form"><label class="field"><span>Email</span><input id="a-email" type="email" autocomplete="username"></label><label class="field"><span>Mot de passe</span><input id="a-pass" type="password" autocomplete="current-password"></label></div>
     <div class="row"><button class="btn primary" onclick="App.signIn(false)">Se connecter</button><button class="btn" onclick="App.signIn(true)">Créer mon compte</button></div></section>`;
-  return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
+  return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><div class="approve"><div><b>Offre ${esc(myPlan().name)}${profile?.is_admin ? ' · Administrateur' : ''}</b><div class="hint">${profile?.is_admin ? 'Aucune limite.' : `${myPlan().projects === Infinity ? 'Projets illimités' : myPlan().projects + ' projets en cours'} · ${myPlan().clients === Infinity ? 'clients illimités' : myPlan().clients + ' clients'}${profile?.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`}</div></div>${profile?.is_admin ? `<button class="btn sm" onclick="App.go('admin')">Administration</button>` : `<a class="btn sm" href="./#offres">Voir les offres</a>`}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
     <div class="row"><button class="btn" onclick="App.syncNow()">Synchroniser maintenant</button><button class="btn ghost" onclick="App.signOut()">Se déconnecter</button></div></section>`;
 };
 function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Lien copié'), () => toast(t)); }
@@ -1071,7 +1119,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { setLayout, approveMedia, copyText, sendPortal, signIn, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signIn, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },

@@ -66,6 +66,33 @@
 .who{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .who span{padding:10px 18px;border-radius:999px;font-size:15px}
 
+/* Tarifs */
+.period{display:inline-flex;padding:4px;border-radius:12px;gap:2px;margin:0 auto 28px}
+.period button{all:unset;cursor:pointer;padding:7px 16px;border-radius:9px;font-size:14px;color:var(--muted)}
+.period button.on{background:rgba(255,255,255,.08);color:var(--fg);font-weight:600}
+.period em{font-style:normal;font-size:12px;color:var(--ok);margin-left:6px}
+.plans{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}
+@media (max-width:1000px){.plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.plans{grid-template-columns:minmax(0,1fr)}}
+.plan{border-radius:20px;padding:24px 22px;display:flex;flex-direction:column;gap:14px;position:relative}
+.plan.hot{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 1px rgba(34,211,238,.35),0 24px 60px -20px rgba(34,211,238,.45)}
+.plan .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:999px;font:600 12px var(--f-body);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04161b;white-space:nowrap}
+.plan h3{font-size:18px}
+.plan .for{color:var(--muted);font-size:14px;min-height:42px}
+.price{display:flex;align-items:baseline;gap:6px}
+.price b{font:800 38px var(--f-display);letter-spacing:-.03em}
+.price span{color:var(--muted);font-size:14px}
+.fcfa{font:500 13px var(--f-mono);color:var(--dim);margin-top:-8px}
+.plan ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
+.plan li{display:flex;gap:9px;font-size:14.5px;color:#c9d1de}
+.plan li::before{content:"✓";color:var(--accent);font-weight:700}
+.plan li.soon{color:var(--dim)}
+.plan .btn{width:100%}
+.paynote{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:26px;text-align:center}
+.paynote .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.paynote .chips span{padding:5px 12px;border-radius:999px;font-size:13px;color:var(--muted);border:1px solid var(--line)}
+.paynote p{color:var(--dim);font-size:14px;max-width:620px}
+
 /* FAQ */
 .faq{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
 .faq details{border-radius:14px;padding:0 20px}
@@ -89,6 +116,7 @@
     <nav class="links" aria-label="Sections">
       <a href="#fonctionnalites">Fonctionnalités</a>
       <a href="#comment">Comment ça marche</a>
+      <a href="#offres">Tarifs</a>
       <a href="#faq">FAQ</a>
       <a href="guide.html">Guide d'utilisation</a>
     </nav>
@@ -175,6 +203,33 @@
     </div>
   </section>
 
+  <section class="section" id="offres">
+    <div class="wrap">
+      <div class="section-head"><span class="eyebrow">Tarifs</span><h2>Une offre pour chaque rythme de travail</h2><p>Commence gratuitement. Passe à une offre supérieure quand tes projets se multiplient. Sans engagement.</p></div>
+      <div style="text-align:center"><div class="period glass" role="group" aria-label="Période de facturation"><button class="on" data-p="m" onclick="setPeriod('m')">Mensuel</button><button data-p="y" onclick="setPeriod('y')">Annuel<em>2 mois offerts</em></button></div></div>
+      <div class="plans">
+        <div class="plan glass"><h3>Découverte</h3><p class="for">Pour tester Validéo sur tes premiers projets.</p>
+          <div class="price"><b>0 €</b><span>pour toujours</span></div><div class="fcfa">0 FCFA</div>
+          <ul><li>2 projets en cours</li><li>3 clients</li><li>Révisions au timecode et sur image</li><li>Espace client privé</li><li>Facture générée automatiquement</li></ul>
+          <a class="btn" href="app.html#/settings">Commencer gratuitement</a></div>
+        <div class="plan glass"><h3>Solo</h3><p class="for">Pour le monteur freelance avec quelques clients réguliers.</p>
+          <div class="price"><b data-m="9 €" data-y="90 €">9 €</b><span data-m="/ mois" data-y="/ an">/ mois</span></div><div class="fcfa" data-m="≈ 5 900 FCFA / mois" data-y="≈ 59 000 FCFA / an">≈ 5 900 FCFA / mois</div>
+          <ul><li>10 projets en cours</li><li>Clients illimités</li><li>6 modèles de facture à ton image</li><li>Relances et comptabilité</li><li>Export CSV pour le comptable</li></ul>
+          <a class="btn" href="app.html#/settings">Choisir Solo</a></div>
+        <div class="plan glass hot"><span class="tag">Le plus choisi</span><h3>Pro</h3><p class="for">Pour celles et ceux qui enchaînent les projets.</p>
+          <div class="price"><b data-m="19 €" data-y="190 €">19 €</b><span data-m="/ mois" data-y="/ an">/ mois</span></div><div class="fcfa" data-m="≈ 12 500 FCFA / mois" data-y="≈ 124 600 FCFA / an">≈ 12 500 FCFA / mois</div>
+          <ul><li>Projets illimités</li><li>Clients illimités</li><li>Tout ce qu'inclut Solo</li><li>Synchronisation sur tous tes appareils</li><li>Support prioritaire par WhatsApp</li></ul>
+          <a class="btn primary" href="app.html#/settings">Choisir Pro</a></div>
+        <div class="plan glass"><h3>Studio</h3><p class="for">Pour les studios et les petites équipes de post-production.</p>
+          <div class="price"><b data-m="39 €" data-y="390 €">39 €</b><span data-m="/ mois" data-y="/ an">/ mois</span></div><div class="fcfa" data-m="≈ 25 600 FCFA / mois" data-y="≈ 255 800 FCFA / an">≈ 25 600 FCFA / mois</div>
+          <ul><li>Tout ce qu'inclut Pro</li><li>Accompagnement à la prise en main</li><li>Volume de projets illimité</li><li class="soon">Jusqu'à 5 monteurs (bientôt)</li></ul>
+          <a class="btn" href="app.html#/settings">Choisir Studio</a></div>
+      </div>
+      <div class="paynote"><div class="chips"><span>MTN MoMo</span><span>Orange Money</span><span>Moov Money</span><span>Wave</span><span>Carte bancaire</span></div>
+        <p>Le paiement en ligne arrive très bientôt. En attendant, crée ton compte : il démarre sur l'offre Découverte, et ton offre est activée dès réception de ton paiement.</p></div>
+    </div>
+  </section>
+
   <section class="section" id="pourqui" style="padding-top:0">
     <div class="wrap">
       <div class="section-head"><span class="eyebrow">Pour qui</span><h2>Pensé pour celles et ceux qui livrent de l'image</h2></div>
@@ -192,6 +247,8 @@
         <details class="glass"><summary>Les messages aux clients partent-ils tout seuls ?</summary><p>Validéo prépare le message (avancement, nouvelle version, facture, relance) et ouvre ta messagerie ou WhatsApp avec le texte prêt. Tu n'as plus qu'à appuyer sur Envoyer.</p></details>
         <details class="glass"><summary>Puis-je modifier une facture générée automatiquement ?</summary><p>Oui. Elle reste « à vérifier » jusqu'à ta validation. Tu peux modifier les lignes, appliquer une remise en pourcentage ou en montant, changer de modèle, puis l'envoyer.</p></details>
         <details class="glass"><summary>Quelles devises sont prises en charge ?</summary><p>Celle de ton choix : euro, FCFA, dollar, dirham… Les modes de paiement incluent virement, Mobile Money, espèces, carte, chèque et PayPal.</p></details>
+        <details class="glass"><summary>Comment payer mon abonnement ?</summary><p>Par Mobile Money (MTN, Orange, Moov), Wave ou carte bancaire. Le paiement en ligne arrive très bientôt ; en attendant, ton compte démarre sur l'offre Découverte et ton offre est activée dès réception du paiement.</p></details>
+        <details class="glass"><summary>Puis-je changer d'offre ou arrêter ?</summary><p>Oui, à tout moment et sans engagement. Si tu reviens à Découverte, tes projets restent consultables ; seule la création de nouveaux projets au-delà de la limite est bloquée.</p></details>
         <details class="glass"><summary>Mes données sont-elles en sécurité ?</summary><p>Chaque compte ne voit que ses propres données. Un client ne voit que son espace, grâce à un lien secret propre à lui. Les fichiers sont stockés dans un espace privé.</p></details>
       </div>
     </div>
@@ -209,7 +266,13 @@
 </main>
 
 <footer class="footer">
-  <div class="wrap"><span>© 2026 Validéo · Suivi de projets vidéo</span><span><a href="guide.html">Guide d'utilisation</a><a href="app.html">Ouvrir l'outil</a><a href="#faq">FAQ</a></span></div>
+  <div class="wrap"><span>© 2026 Validéo · Suivi de projets vidéo</span><span><a href="#offres">Tarifs</a><a href="guide.html">Guide d'utilisation</a><a href="app.html">Ouvrir l'outil</a><a href="#faq">FAQ</a></span></div>
 </footer>
+<script>
+  function setPeriod(p) {
+    document.querySelectorAll('.period button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+    document.querySelectorAll('[data-m]').forEach(el => { el.textContent = el.dataset[p]; });
+  }
+</script>
 </body>
 </html>
