@@ -1,5 +1,5 @@
 // Validéo : fonctionnement hors ligne (cache de l'application)
-const CACHE = 'valideo-v4';
+const CACHE = 'valideo-v5';
 const SHELL = ['./', './index.html', './app.html', './guide.html', './app.js', './config.js', './manifest.webmanifest', './icon.svg',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
 

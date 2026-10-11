@@ -1,11 +1,13 @@
 const App = (() => {
 /* ---------------- Stockage hors ligne (IndexedDB) ---------------- */
+const QS = new URLSearchParams(location.search);
+const DEMO = QS.has('demo') || QS.has('capture');
 const DB = {
   db: null, mem: { kv: {}, files: {} },
   async open() {
     try {
       this.db = await new Promise((res, rej) => {
-        const r = indexedDB.open('valideo', 1);
+        const r = indexedDB.open(DEMO ? 'valideo-demo' : 'valideo', 1);
         r.onupgradeneeded = () => { r.result.createObjectStore('kv'); r.result.createObjectStore('files'); };
         r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
       });
@@ -271,8 +273,9 @@ function pDashboard() {
   S.invoices.forEach(i => { if (!isSent(i)) return; const t = totals(i); toCollect += t.due; if (invStatus(i) === 'retard') { late += t.due; lateN++; } (i.payments || []).forEach(p => { if (p.date.slice(0, 7) === mo) month += +p.amount; }); });
   const active = S.projects.filter(p => p.status !== 'termine').sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
   const recent = S.activity.slice(0, 6);
-  return `${S.settings.sample ? `<div class="banner"><span>Vous découvrez Validéo avec des <b>données d'exemple</b>. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
-  <div class="ph"><div><div class="eyebrow">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour ${esc((S.settings.owner || '').split(' ')[0])}</h1></div>
+  const fresh = !DEMO && !S.clients.length && !S.projects.length;
+  return `${fresh ? `<section class="card" style="margin-bottom:18px"><div class="card-h"><h2>Bienvenue sur Validéo</h2><a class="link" href="guide.html" target="_blank" rel="noopener">Lire le guide</a></div><div class="alerts">${[['1', 'Renseigne ton identité', 'Nom, logo, couleur, signature : tes factures seront à ton image.', 'settings', S.settings.name ? 'Fait' : ''], ['2', 'Ajoute ton premier client', 'Son email et son WhatsApp pour lui envoyer les alertes.', 'clients', ''], ['3', 'Crée ton premier projet', 'Montant, date de livraison et étapes à valider.', 'projects', '']].map(([n, t, d, pg, done]) => `<div class="alert ${done ? 'ok' : 'info'}"><span class="sev"></span><div><div class="a-t">${n}. ${t}</div><div class="a-s">${d}</div></div><button class="btn sm ${done ? '' : 'primary'}" onclick="${pg === 'clients' ? 'App.editClient()' : pg === 'projects' ? 'App.editProject()' : `App.go('${pg}')`}">${done || 'Commencer'}</button></div>`).join('')}</div>${user ? '' : `<p class="hint">Pense à <a onclick="App.go('settings')">créer ton compte en ligne</a> pour retrouver tes données sur tous tes appareils.</p>`}</section>` : ''}${DEMO ? `<div class="banner"><span><b>Mode démo</b> : clients, projets et factures fictifs. Rien n'est enregistré en ligne. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><a class="btn sm primary" href="app.html#/settings">Créer mon compte</a></div>` : S.settings.sample ? `<div class="banner"><span>Cet appareil contient encore des <b>données d'exemple</b>.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
+  <div class="ph"><div><div class="eyebrow">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour${S.settings.owner ? ' ' + esc(S.settings.owner.split(' ')[0]) : ''}</h1></div>
   <div class="row"><button class="btn" onclick="App.editClient()">Nouveau client</button><button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
   <div class="kpis">${kpi('Projets en cours', active.length, `${S.projects.filter(p => p.status === 'termine').length} terminés`)}${kpi('À encaisser', fmt(toCollect), 'factures envoyées')}${kpi('En retard', fmt(late), `${lateN} facture${lateN > 1 ? 's' : ''}`, late ? 'bad' : '')}${kpi('Encaissé ce mois', fmt(month), new Date().toLocaleDateString('fr-FR', { month: 'long' }), 'ok')}</div>
   <div class="grid2"><section class="card"><div class="card-h"><h2>À traiter</h2><span class="muted small">${al.length} élément${al.length > 1 ? 's' : ''}</span></div>${alertList(al)}</section>
@@ -839,7 +842,7 @@ function setFilter(kind, v) { if (kind === 'proj') projFilter = v; else invFilte
 
 /* ---------------- État initial & exemples ---------------- */
 function blankState() {
-  return { settings: { name: 'Mon studio', owner: 'Votre nom', email: '', phone: '', address: '', siret: '', iban: 'IBAN : …', currency: '€', tva: 0, payDays: 30, prefix: 'FAC', next: 1, template: 'moderne', color: '#0b7285', logo: '', signature: '', stampTop: 'MON STUDIO', stampBottom: 'MONTAGE VIDÉO', stampCenter: 'BON POUR ACCORD', showStamp: true, legal: '', penalty: '', sample: false }, clients: [], projects: [], media: [], invoices: [], expenses: [], activity: [] };
+  return { settings: { name: '', owner: '', email: '', phone: '', address: '', siret: '', iban: 'IBAN : …', currency: '€', tva: 0, payDays: 30, prefix: 'FAC', next: 1, template: 'moderne', color: '#0b7285', logo: '', signature: '', stampTop: 'MON STUDIO', stampBottom: 'MONTAGE VIDÉO', stampCenter: 'BON POUR ACCORD', showStamp: true, legal: '', penalty: '', sample: false }, clients: [], projects: [], media: [], invoices: [], expenses: [], activity: [] };
 }
 /* ---------------- En ligne : Supabase (compte, synchro, fichiers, espaces clients) ---------------- */
 const URL_TTL = 60 * 60 * 24 * 14;
@@ -1095,7 +1098,7 @@ function applyHash() {
 }
 async function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-  Cloud.init();
+  if (!DEMO) Cloud.init();
   PORTAL_TOKEN = new URLSearchParams(location.search).get('portail');
   if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
   if (PORTAL_TOKEN) {
@@ -1108,7 +1111,7 @@ async function init() {
   }
   await DB.open();
   let st = await DB.get('kv', 'state').catch(() => null);
-  if (!st) { st = await seed(); await DB.put('kv', 'state', st).catch(() => {}); }
+  if (!st) { st = DEMO ? await seed() : blankState(); await DB.put('kv', 'state', st).catch(() => {}); }
   S = migrate(st);
   try { const v = JSON.parse(localStorage.getItem('valideo-view')); if (v && (v.as === 'me' || client(v.clientId))) view = v; } catch (e) {}
   if (!applyHash() && !isOwner()) route = { page: 'client', id: view.clientId };
