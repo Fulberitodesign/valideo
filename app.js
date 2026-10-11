@@ -52,6 +52,12 @@ const isOwner = () => view.as === 'me';
 const TYPE_LABEL = { video: 'VIDÉO', audio: 'AUDIO', image: 'IMAGE' };
 const DEFAULT_STEPS = ['Brief & devis validés', 'Dérushage', 'Montage V1', 'Retours client', 'Corrections / V2', 'Étalonnage & mixage', 'Livraison des fichiers'];
 const COLORS = ['#0b7285', '#1c3d5a', '#5f3dc4', '#c2255c', '#d9480f', '#2b8a3e', '#212529'];
+const TEMPLATES = [['moderne', 'Moderne'], ['classique', 'Classique'], ['epure', 'Épuré'], ['lateral', 'Bande latérale'], ['prestige', 'Prestige'], ['encadre', 'Encadré']];
+const tplName = k => (TEMPLATES.find(t => t[0] === k) || [k, k])[1];
+let layout = { clients: 'grid', projects: 'list', invoices: 'list' };
+try { Object.assign(layout, JSON.parse(localStorage.getItem('valideo-layout')) || {}); } catch (e) {}
+const viewToggle = k => `<div class="vtoggle" role="group" aria-label="Affichage"><button class="${layout[k] === 'list' ? 'on' : ''}" onclick="App.setLayout('${k}','list')" title="Liste" aria-label="Affichage en liste"><svg viewBox="0 0 16 16"><path d="M2 3.5h12M2 8h12M2 12.5h12"/></svg></button><button class="${layout[k] === 'grid' ? 'on' : ''}" onclick="App.setLayout('${k}','grid')" title="Grille" aria-label="Affichage en grille"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></button></div>`;
+function setLayout(k, v) { layout[k] = v; try { localStorage.setItem('valideo-layout', JSON.stringify(layout)); } catch (e) {} render(); }
 const METHODS = ['Virement', 'Mobile Money', 'Espèces', 'Carte bancaire', 'Chèque', 'PayPal'];
 
 const CFG = window.VALIDEO_CONFIG || {};
@@ -203,7 +209,8 @@ function navHTML() {
 function render() {
   if (!isOwner() && !client(view.clientId)) view = { as: 'me' };
   $('#nav').innerHTML = navHTML();
-  $('#role').innerHTML = `<option value="me">Moi · ${esc(S.settings.owner || 'Monteur')}</option>` + S.clients.map(c => `<option value="${c.id}">Client · ${esc(cname(c))}</option>`).join('');
+  $('#role').innerHTML = `<option value="me">Ma vue (monteur)</option><optgroup label="Voir comme un client">` + S.clients.map(c => `<option value="${c.id}">${esc(cname(c))}</option>`).join('') + '</optgroup>';
+  $('#role-box').classList.toggle('client', !isOwner());
   $('#role').value = isOwner() ? 'me' : view.clientId;
   const r = route; let html;
   if (isOwner()) {
@@ -262,7 +269,9 @@ function actList(list, withProj) {
 
 /* ----- Clients ----- */
 function pClients() {
-  return `<div class="ph"><div><h1>Clients</h1><div class="meta">${S.clients.length} client${S.clients.length > 1 ? 's' : ''}</div></div><button class="btn primary" onclick="App.editClient()">Nouveau client</button></div>
+  const head = `<div class="ph"><div><h1>Clients</h1><div class="meta">${S.clients.length} client${S.clients.length > 1 ? 's' : ''}</div></div><div class="row">${viewToggle('clients')}<button class="btn primary" onclick="App.editClient()">Nouveau client</button></div></div>`;
+  if (S.clients.length && layout.clients === 'list') return head + `<section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Client</th><th>Contact</th><th class="num">En cours</th><th class="num">Total des projets</th><th class="num">Impayés</th></tr></thead><tbody>${S.clients.map(c => { const s = clientStats(c.id); return `<tr class="click" onclick="App.go('client','${c.id}')"><td><div class="row" style="flex-wrap:nowrap"><span class="avatar" style="width:32px;height:32px;font-size:12px">${initials(cname(c))}</span><b>${esc(cname(c))}</b></div></td><td class="muted small">${esc(c.company ? c.name : '')}${c.company ? '<br>' : ''}<span class="mono">${esc(c.email || c.phone || '')}</span></td><td class="num">${s.active}</td><td class="num">${fmt(s.value)}</td><td class="num" style="color:${s.due ? 'var(--bad)' : 'var(--ok)'}">${fmt(s.due)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+  return head + `
   ${S.clients.length ? `<div class="cgrid">${S.clients.map(c => { const s = clientStats(c.id); return `<button class="ccard" onclick="App.go('client','${c.id}')"><div class="row"><span class="avatar">${initials(cname(c))}</span><div style="min-width:0"><div class="cn">${esc(cname(c))}</div><div class="muted small">${esc(c.company ? c.name : (c.email || c.phone || ''))}</div></div></div>
   <div class="cl"><span class="muted">Projets en cours</span><b class="mono">${s.active}</b></div><div class="cl"><span class="muted">Total des projets</span><b class="mono">${fmt(s.value)}</b></div><div class="cl"><span class="muted">Impayés</span><b class="mono" style="color:${s.due ? 'var(--bad)' : 'var(--ok)'}">${fmt(s.due)}</b></div></button>`; }).join('')}</div>` : `<p class="empty">Ajoutez votre premier client pour lui créer un tableau de bord.</p>`}`;
 }
@@ -285,9 +294,11 @@ function pClient(id) {
 function pProjects() {
   const list = S.projects.filter(p => projFilter === 'all' || (projFilter === 'termine' ? p.status === 'termine' : p.status !== 'termine'));
   const tab = (k, l) => `<button class="${projFilter === k ? 'on' : ''}" onclick="App.setFilter('proj','${k}')">${l}</button>`;
-  return `<div class="ph"><h1>Projets</h1><button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div>
-  <div class="tabs">${tab('en_cours', 'En cours')}${tab('termine', 'Terminés')}${tab('all', 'Tous')}</div>
-  <section class="card">${list.length ? `<div class="plist">${list.map(p => projRow(p)).join('')}</div>` : '<p class="empty">Aucun projet dans cette vue.</p>'}</section>`;
+  const body = !list.length ? '<section class="card"><p class="empty">Aucun projet dans cette vue.</p></section>'
+    : layout.projects === 'grid' ? `<div class="cgrid">${list.map(p => { const pr = progress(p); return `<button class="ccard" onclick="App.go('project','${p.id}')"><div class="card-h"><span class="muted small">${esc(cname(client(p.clientId)))}</span>${deadlinePill(p)}</div><div class="cn">${esc(p.title)}</div><div class="prog"><div class="bar ${pr === 100 ? 'done' : ''}"><i style="width:${pr}%"></i></div><span class="mono small">${pr}%</span></div><div class="cl"><span class="muted">Livraison</span><b>${fdate(p.deadline)}</b></div><div class="cl"><span class="muted">Montant HT</span><b class="mono">${fmt(p.amount)}</b></div></button>`; }).join('')}</div>`
+    : `<section class="card"><div class="plist">${list.map(p => projRow(p)).join('')}</div></section>`;
+  return `<div class="ph"><h1>Projets</h1><div class="row">${viewToggle('projects')}<button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
+  <div class="tabs">${tab('en_cours', 'En cours')}${tab('termine', 'Terminés')}${tab('all', 'Tous')}</div>${body}`;
 }
 function pProject(id) {
   const p = proj(id); if (!p) return nf();
@@ -370,10 +381,10 @@ function pInvoices() {
   const list = S.invoices.filter(i => { const st = invStatus(i); return invFilter === 'all' || st === invFilter || (invFilter === 'envoyee' && st === 'partielle'); }).sort((a, b) => b.number.localeCompare(a.number));
   const count = k => S.invoices.filter(i => invStatus(i) === k).length;
   const tab = (k, l) => `<button class="${invFilter === k ? 'on' : ''}" onclick="App.setFilter('inv','${k}')">${l}${k !== 'all' && count(k) ? ` · ${count(k)}` : ''}</button>`;
-  return `<div class="ph"><h1>Factures</h1><div class="row"><button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
+  return `<div class="ph"><h1>Factures</h1><div class="row">${viewToggle('invoices')}<button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
   <div class="tabs">${tab('all', 'Toutes')}${tab('a_verifier', 'À vérifier')}${tab('brouillon', 'Brouillons')}${tab('envoyee', 'Envoyées')}${tab('retard', 'En retard')}${tab('payee', 'Payées')}</div>
-  <section class="card">${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Projet</th><th>Émise</th><th>Échéance</th><th class="num">Total</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
-  ${list.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${esc(cname(client(i.clientId)))}</td><td class="muted">${esc(proj(i.projectId)?.title || '—')}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture dans cette vue.</p>'}</section>`;
+  ${list.length && layout.invoices === 'grid' ? `<div class="cgrid">${list.map(i => { const t = totals(i); return `<button class="ccard" onclick="App.go('invoice','${i.id}')"><div class="card-h"><span class="mono small">${i.number}</span>${invPill(i)}</div><div class="cn">${esc(cname(client(i.clientId)))}</div><div class="muted small">${esc(proj(i.projectId)?.title || 'Sans projet')}</div><div class="k-v mono" style="font-size:22px;font-weight:600">${fmt(t.ttc)}</div><div class="cl"><span class="muted">Échéance</span><b>${fdate(i.due)}</b></div><div class="cl"><span class="muted">Reste à payer</span><b class="mono" style="color:${t.due && isSent(i) ? 'var(--bad)' : 'inherit'}">${fmt(t.due)}</b></div></button>`; }).join('')}</div>` : `<section class="card">${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Projet</th><th>Émise</th><th>Échéance</th><th class="num">Total</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
+  ${list.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${esc(cname(client(i.clientId)))}</td><td class="muted">${esc(proj(i.projectId)?.title || '—')}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture dans cette vue.</p>'}</section>`}`;
 }
 function stampSVG(st, color) {
   const k = uid();
@@ -415,7 +426,7 @@ function pInvoice(id) {
     side += summary;
     if (isSent(i)) side += `<section class="card"><h2>Actions</h2><div class="row">${t.due ? `<button class="btn primary" onclick="App.payModal('${i.id}')">Enregistrer un paiement</button><button class="btn" onclick="App.remind('${i.id}')">Relancer</button>` : ''}<button class="btn" onclick="App.sendInvoice('${i.id}')">Renvoyer</button><button class="btn" onclick="App.editInvoice('${i.id}')">Modifier</button></div></section>`;
     side += pays;
-    side += `<section class="card"><h2>Apparence</h2><label class="field"><span>Modèle de cette facture</span><select onchange="App.setTpl('${i.id}',this.value)"><option value="">Modèle par défaut (${S.settings.template})</option>${['moderne', 'classique', 'epure'].map(k => `<option value="${k}" ${i.template === k ? 'selected' : ''}>${{ moderne: 'Moderne', classique: 'Classique', epure: 'Épuré' }[k]}</option>`).join('')}</select></label><button class="link" onclick="App.go('settings')">Logo, couleurs, signature et cachet</button></section>
+    side += `<section class="card"><h2>Apparence</h2><label class="field"><span>Modèle de cette facture</span><select onchange="App.setTpl('${i.id}',this.value)"><option value="">Modèle par défaut (${tplName(S.settings.template)})</option>${TEMPLATES.map(([k, l]) => `<option value="${k}" ${i.template === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button class="link" onclick="App.go('settings')">Logo, couleurs, signature et cachet</button></section>
     <button class="btn ghost danger" onclick="App.delInvoice('${i.id}')">Supprimer la facture</button>`;
   } else {
     side = summary + `<section class="card"><h2>Comment régler</h2><pre class="hint" style="white-space:pre-wrap;font:inherit;margin:0">${esc(S.settings.iban)}</pre><p class="hint">Indiquez la référence <b class="mono">${esc(i.number)}</b> avec votre paiement.</p></section>` + pays;
@@ -476,7 +487,7 @@ function pSettings() {
   <section class="card"><h2>Identité visuelle</h2>
     <div class="field"><span>Logo ou photo</span><div class="row">${st.logo ? `<img src="${st.logo}" alt="Logo" style="max-height:48px;max-width:140px;border-radius:6px;background:#fff;padding:4px">` : ''}<label class="btn sm">${st.logo ? 'Remplacer' : 'Importer une image'}<input type="file" hidden accept="image/*" onchange="App.uploadLogo(this)"></label>${st.logo ? `<button class="link sm" onclick="App.setS('logo','',true)">Retirer</button>` : ''}</div></div>
     <div class="field"><span>Couleur de marque</span><div class="swatches">${COLORS.map(c => `<button class="sw ${st.color === c ? 'on' : ''}" style="background:${c}" aria-label="Couleur ${c}" onclick="App.setS('color','${c}',true)"></button>`).join('')}<input id="s-color" type="color" value="${esc(st.color)}" onchange="App.setS('color',this.value,true)" aria-label="Couleur personnalisée" style="width:42px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:none"></div></div>
-    <div class="field"><span>Modèle de facture</span><div class="tpl-pick">${[['moderne', 'Moderne'], ['classique', 'Classique'], ['epure', 'Épuré']].map(([k, l]) => `<button class="tpl-opt ${st.template === k ? 'on' : ''}" onclick="App.setS('template','${k}',true)"><div class="thumb">${invoiceDoc(sampleInvoice(), k)}</div><span>${l}</span></button>`).join('')}</div></div>
+    <div class="field"><span>Modèle de facture</span><div class="tpl-pick">${TEMPLATES.map(([k, l]) => `<button class="tpl-opt ${st.template === k ? 'on' : ''}" onclick="App.setS('template','${k}',true)"><div class="thumb">${invoiceDoc(sampleInvoice(), k)}</div><span>${l}</span></button>`).join('')}</div></div>
   </section>
   <section class="card"><h2>Signature</h2><p class="hint">Signez avec la souris ou le doigt, ou importez une image de signature.</p><canvas id="sigpad" width="840" height="300"></canvas>
     <div class="row"><button class="btn sm primary" onclick="App.saveSig()">Enregistrer la signature</button><button class="btn sm" onclick="App.clearSig()">Effacer</button><label class="btn sm ghost">Importer une image<input type="file" hidden accept="image/*" onchange="App.uploadSig(this)"></label>${st.signature ? `<button class="link sm" onclick="App.setS('signature','',true)">Retirer la signature</button>` : ''}</div></section>
@@ -1047,7 +1058,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { approveMedia, copyText, sendPortal, signIn, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { setLayout, approveMedia, copyText, sendPortal, signIn, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
