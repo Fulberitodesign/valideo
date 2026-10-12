@@ -123,9 +123,9 @@ Deno.serve(async (req) => {
     const back = `${SITE}app.html?paiement=${pay.id}`;
     const names = { first_name: first || 'Client', last_name: rest.join(' ') || 'Valideo' };
     const r = card
-      ? await fetch(`${API}/public/card`, { method: 'POST', headers, body: JSON.stringify({
+      ? await fetch(`${API}/transactions/public/requesttopay/init`, { method: 'POST', headers, body: JSON.stringify({
           shop, amount: String(amount), currency: 'XOF', ...names, email: user.email, phoneNumber: phone,
-          adress: 'Cotonou', city: 'Cotonou', zip: '00229', country: 'BJ', receiptUrl: back }) })
+          city: 'Cotonou', zip: '00229', country: 'BJ', description, callback_info: String(pay.id) }) })
       : await fetch(`${API}/transactions/public/requesttopay/${reseau}`, { method: 'POST', headers, body: JSON.stringify({
           shop, amount, phoneNumber: Number(phone), ...names, description, callback_info: { payment_id: String(pay.id) },
           return_url: back, cancel_url: back, ...(body.otp ? { otp: String(body.otp) } : {}) }) });
