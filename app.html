@@ -271,6 +271,21 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .seg button{all:unset;cursor:pointer;text-align:center;padding:11px 12px;border-radius:12px;border:2px solid var(--line);background:var(--surface-2);font-weight:600}
 .seg button.on{border-color:var(--accent);background:var(--accent-soft)}
 .seg button small,.seg button em{display:block;font-weight:400;font-style:normal;font-size:12px;color:var(--muted)}
+.plan-chip{cursor:pointer}
+.plan-chip .up{color:var(--accent);font-weight:600}
+.plan-chip:hover{border-color:var(--accent)}
+.plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:1100px){.plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.plan-grid{grid-template-columns:minmax(0,1fr)}}
+.plan-card{position:relative;display:flex;flex-direction:column;gap:10px;padding:22px 20px;border-radius:var(--r);background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);box-shadow:var(--shadow),inset 0 1px 0 var(--hl)}
+.plan-card.hot{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.plan-card.cur{box-shadow:0 0 0 2px var(--ok),var(--shadow)}
+.plan-card .pp b{font:700 32px var(--f-display);letter-spacing:-.02em}
+.plan-card .pp span{color:var(--muted);margin-left:4px}
+.plan-card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;flex:1}
+.plan-card li{display:flex;gap:8px;font-size:14px}
+.plan-card li::before{content:"✓";color:var(--accent);font-weight:700}
+.plan-card .btn{width:100%}
 .addproj{width:auto;max-width:100%;padding:5px 10px;font-size:13px;border-radius:8px}
 .linkrow{cursor:default;align-items:flex-start}
 .card.away{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:linear-gradient(160deg,var(--accent-soft),var(--glass) 55%)}
@@ -552,6 +567,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
     <header class="topbar">
       <a class="chip guide-chip" href="guide.html" target="_blank" rel="noopener">Guide d'utilisation</a>
       <button class="chip theme-chip" data-theme-btn onclick="cycleTheme()" type="button">Thème</button>
+      <button class="chip plan-chip" id="planChip" type="button" hidden onclick="App.go('plan')"></button>
       <button class="chip sync" id="sync" onclick="App.go('settings')" title="État de la synchronisation"></button>
       <div class="chip role" id="role-box"><label for="role">Affichage</label><select id="role" onchange="App.setRole(this.value)"></select></div>
     </header>
@@ -567,8 +583,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=18"></script>
+<script src="config.js?v=19"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

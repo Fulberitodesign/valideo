@@ -126,6 +126,33 @@ const myPlan = () => planExpired() ? PLANS.decouverte : (PLANS[profile?.plan] ||
 const PRICE_XOF = { solo: { month: 6600, year: 65600 }, pro: { month: 12500, year: 124600 }, studio: { month: 26200, year: 262400 } };
 const xof = n => n.toLocaleString('fr-FR') + ' FCFA';
 let payChoice = { plan: 'pro', period: 'month', method: 'mobile' };
+const PLAN_FEATS = {
+  decouverte: ['2 projets en cours', '2 clients', 'Révisions au timecode et sur image', 'Espace client et invitations', 'Facture générée automatiquement'],
+  solo: ['10 projets en cours', 'Clients illimités', '6 modèles de facture', 'Relances et comptabilité', 'Export CSV pour le comptable'],
+  pro: ['Projets illimités', 'Clients illimités', 'Tout ce qu’inclut Solo', 'Synchronisation sur tous tes appareils', 'Support prioritaire WhatsApp'],
+  studio: ['Tout ce qu’inclut Pro', 'Équipes et invités illimités', 'Accompagnement à la prise en main', 'Volume de projets illimité']
+};
+let myPays = null;
+async function loadMyPays() { const { data } = await sb.from('payments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20); myPays = data || []; if (route.page === 'plan') render(); }
+function pPlan() {
+  if (!user || !Cloud.ready) return '<section class="card"><h2>Mon offre</h2><p class="hint">Connecte-toi à ton compte pour gérer ton offre.</p></section>';
+  if (!myPays) loadMyPays();
+  const admin = !!profile?.is_admin, curKey = admin ? 'studio' : (planExpired() ? 'decouverte' : (profile?.plan || 'decouverte')), cur = PLANS[curKey];
+  const used = { projects: S.projects.filter(x => x.status !== 'termine').length, clients: S.clients.length };
+  const gauge = (k, l) => { const lim = admin ? Infinity : cur[k], pct = lim === Infinity ? 0 : Math.min(100, used[k] / lim * 100);
+    return `<div class="kpi ${pct >= 100 ? 'warn' : ''}"><span class="k-l">${l}</span><span class="k-v">${used[k]}${lim === Infinity ? '' : ' / ' + lim}</span><span class="k-s">${lim === Infinity ? 'Illimité' : pct >= 100 ? 'Limite atteinte' : (lim - used[k]) + ' restant' + (lim - used[k] > 1 ? 's' : '')}</span>${lim === Infinity ? '' : `<div class="bar" style="margin-top:8px"><i style="width:${pct}%"></i></div>`}</div>`; };
+  const card = k => { const p = PLANS[k], isCur = k === curKey && !admin, paid = k !== 'decouverte';
+    return `<div class="plan-card ${isCur ? 'cur' : ''} ${k === 'pro' ? 'hot' : ''}">${k === 'pro' ? '<i class="pay-tag">Le plus choisi</i>' : ''}<h3>${p.name}</h3>
+      <div class="pp"><b>${p.price ? p.price + ' €' : 'Gratuit'}</b>${p.price ? '<span>/ mois</span>' : ''}</div><div class="muted small mono">${p.price ? '≈ ' + xof(PRICE_XOF[k].month) + ' / mois' : 'pour toujours'}</div>
+      <ul>${PLAN_FEATS[k].map(f => `<li>${f}</li>`).join('')}</ul>
+      ${isCur ? (paid ? `<button class="btn" onclick="App.upgradeModal('${k}')">Prolonger</button>` : '<span class="pill ok" style="align-self:flex-start">Offre actuelle</span>') : paid ? `<button class="btn ${k === 'pro' ? 'primary' : ''}" onclick="App.upgradeModal('${k}')">Choisir ${p.name}</button>` : '<span class="muted small">Retour automatique à l’échéance d’une offre payante</span>'}</div>`; };
+  const PST = { success: ['ok', 'Payé'], pending: ['warn', 'En attente'], failed: ['bad', 'Échoué'], cancelled: ['', 'Annulé'], mismatch: ['bad', 'Incohérent'] };
+  return `<div class="ph"><div><h1>Mon offre</h1><div class="meta">${admin ? 'Compte administrateur : aucune limite.' : `Offre <b>${cur.name}</b>${profile?.plan_until && curKey !== 'decouverte' ? ' · valable jusqu’au ' + fdate(profile.plan_until) : ''}${planExpired() ? ' · ton offre précédente a expiré' : ''}`}</div></div>${admin ? '' : `<button class="btn primary" onclick="App.upgradeModal('${curKey === 'decouverte' ? 'pro' : curKey}')">${curKey === 'decouverte' ? 'Passer à une offre supérieure' : 'Prolonger mon offre'}</button>`}</div>
+    <div class="kpis">${gauge('projects', 'Projets en cours')}${gauge('clients', 'Clients')}${kpi('Moyens de paiement', 'Mobile Money · Carte', 'MTN, Moov, Visa, Mastercard')}</div>
+    <div class="plan-grid">${['decouverte', 'solo', 'pro', 'studio'].map(card).join('')}</div>
+    <section class="card" style="margin-top:18px"><h2>Mes paiements</h2>${!myPays ? '<p class="hint">Chargement…</p>' : myPays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Offre</th><th>Moyen</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>${myPays.map(p => `<tr><td>${ftime(p.created_at)}</td><td>${esc(PLANS[p.plan]?.name || p.plan)} · ${p.period === 'year' ? '1 an' : '1 mois'}</td><td>${p.method === 'card' ? 'Carte bancaire' : p.method === 'mobile' ? 'Mobile Money' : '—'}</td><td class="num">${xof(p.amount)}</td><td>${pill(...(PST[p.status] || ['', p.status]))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement pour l’instant.</p>'}
+    <p class="hint">Paiement sécurisé par Moneroo. Validéo ne voit jamais tes données de carte. Une question ? <a href="mailto:contactfulbert1@gmail.com">contactfulbert1@gmail.com</a></p></section>`;
+}
 function upgradeModal(plan) {
   if (!user || !Cloud.ready) return toast('Connecte-toi à ton compte pour changer d\'offre.');
   if (plan) payChoice.plan = plan;
@@ -153,12 +180,12 @@ async function startPayment() {
 }
 /* Retour depuis la page de paiement : on attend la confirmation du serveur */
 async function watchPayment(pid) {
-  history.replaceState(null, '', location.pathname + '#/settings');
-  route = { page: 'settings' }; render();
+  history.replaceState(null, '', location.pathname + '#/plan');
+  route = { page: 'plan' }; myPays = null; render();
   toast('Paiement reçu, confirmation en cours…');
   for (let i = 0; i < 20; i++) {
     const { data } = await sb.from('payments').select('status, plan').eq('id', pid).maybeSingle();
-    if (data?.status === 'success') { await loadProfile(); render(); return toast(`Merci ! Ton offre ${PLANS[data.plan].name} est active.`); }
+    if (data?.status === 'success') { await loadProfile(); myPays = null; render(); return toast(`Merci ! Ton offre ${PLANS[data.plan].name} est active.`); }
     if (data && ['failed', 'cancelled', 'mismatch'].includes(data.status)) return toast(data.status === 'cancelled' ? 'Paiement annulé : ton offre n\'a pas changé.' : 'Le paiement n\'a pas abouti. Aucun montant n\'a été validé : tu peux réessayer.');
     await new Promise(res => setTimeout(res, 3000));
   }
@@ -168,7 +195,7 @@ function planAllows(kind) {
   if (!user || !profile || profile.is_admin) return true;
   const p = myPlan(), n = kind === 'projects' ? S.projects.filter(x => x.status !== 'termine').length : S.clients.length;
   if (n < p[kind]) return true;
-  toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Changer d\'offre', () => upgradeModal(p.name === 'Découverte' ? 'solo' : 'pro'));
+  toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Voir les offres', () => go('plan'));
   return false;
 }
 const METHODS = ['Virement', 'Mobile Money', 'Espèces', 'Carte bancaire', 'Chèque', 'PayPal'];
@@ -325,6 +352,7 @@ function navHTML() {
   const parent = { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
   const nA = alerts().filter(a => a.lvl !== 'info').length, nV = S.invoices.filter(i => i.status === 'a_verifier').length;
   const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['settings', 'Identité & réglages']];
+  if (user) items.splice(items.length - 1, 0, ['plan', 'Mon offre']);
   if (profile?.is_admin) items.push(['admin', 'Administration']);
   return items.map(([k, l, n]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
 }
@@ -342,7 +370,7 @@ function renderPage() {
   $('#role').value = isOwner() ? 'me' : view.clientId;
   const r = route; let html;
   if (isOwner()) {
-    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin }[r.page] || pDashboard)(r.id);
+    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin, plan: pPlan }[r.page] || pDashboard)(r.id);
   } else {
     const cid = view.clientId; let ok = false;
     if (isTeam() && route.page !== 'media') route = { page: 'project', id: S.projects[0]?.id };
@@ -355,6 +383,9 @@ function renderPage() {
   }
   $('#main').innerHTML = html;
   $('#sync').innerHTML = syncChip(); $('#sync').hidden = MODE === 'portal';
+  const pc = $('#planChip');
+  if (pc) { const show = MODE !== 'portal' && isOwner() && !!user && !!profile; pc.hidden = !show;
+    if (show) { const cur = profile.is_admin ? null : myPlan(); pc.innerHTML = profile.is_admin ? '<b>Administrateur</b>' : cur === PLANS.decouverte ? 'Offre <b>Découverte</b> · <span class="up">Passer à Pro</span>' : `Offre <b>${cur.name}</b>${profile.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`; } }
   afterRender();
 }
 function syncChip() {
