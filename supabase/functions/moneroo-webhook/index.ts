@@ -19,9 +19,11 @@ function sameText(a: string, b: string) {
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Méthode non autorisée', { status: 405 });
+  const webhookSecret = Deno.env.get('MONEROO_WEBHOOK_SECRET');
+  if (!webhookSecret) return new Response('Webhook non configuré', { status: 503 });
   const raw = await req.text();
   const signature = (req.headers.get('X-Moneroo-Signature') || '').trim().toLowerCase();
-  const expected = await hmacHex(Deno.env.get('MONEROO_WEBHOOK_SECRET') || '', raw);
+  const expected = await hmacHex(webhookSecret, raw);
   if (!signature || !sameText(signature, expected)) return new Response('Signature invalide', { status: 403 });
 
   let event: { event?: string; data?: { id?: string } };
