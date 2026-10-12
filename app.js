@@ -818,6 +818,25 @@ function editInvoice(id, preset = {}) {
   if (!draft.clientId) { toast('Ajoutez d\'abord un client.'); return editClient(); }
   openModal(i ? `Modifier ${i.number}` : 'Nouvelle facture', invForm(), `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveInvoice()">Enregistrer</button>`, true);
 }
+/* Projets du client pas encore présents sur la facture, avec le montant restant à facturer */
+function projLinePicker(d) {
+  const inLines = new Set([...d.lines.map(l => l.projectId).filter(Boolean), ...(d.projectId ? [d.projectId] : [])]);
+  const ps = S.projects.filter(p => p.clientId === d.clientId && !inLines.has(p.id));
+  if (!ps.length) return '';
+  return `<select id="d-addproj" class="addproj" onchange="App.addProjLine(this.value)" aria-label="Ajouter un projet comme ligne"><option value="">+ Ajouter un projet comme ligne…</option>${ps.map(p => { const rest = round((+p.amount || 0) - projectBilled(p.id, d.id)); return `<option value="${p.id}">${esc(p.title)} · ${p.status === 'termine' ? 'terminé' : 'en cours ' + progress(p) + ' %'} · ${rest > 0 ? 'reste ' + fmt(rest) : 'déjà facturé'}</option>`; }).join('')}</select>`;
+}
+function addProjLine(pid) {
+  const p = proj(pid); if (!p) return;
+  const rest = round((+p.amount || 0) - projectBilled(pid, draft.id));
+  // Une ligne vide de départ est remplacée par le projet
+  draft.lines = draft.lines.filter(l => l.label || +l.price || l.projectId);
+  // Les lignes existantes d'une facture de projet appartiennent à ce projet
+  if (draft.projectId) draft.lines.forEach(l => { if (!l.projectId) l.projectId = draft.projectId; });
+  draft.lines.push({ label: p.title + (p.status === 'termine' ? ' — projet terminé' : ` — en cours (${progress(p)} %)`), qty: 1, price: Math.max(0, rest), projectId: pid });
+  if (new Set(draft.lines.map(l => l.projectId).filter(Boolean)).size > 1 && draft.kind !== 'acompte') draft.kind = 'groupee';
+  $('#m-body').innerHTML = invForm();
+  if (rest <= 0) toast(`« ${p.title} » est déjà entièrement facturé : la ligne est à 0. Ajuste le montant si besoin.`);
+}
 function invForm() {
   const d = draft, ps = S.projects.filter(p => p.clientId === d.clientId), t = totals(d);
   return `<div class="form">
@@ -827,7 +846,7 @@ function invForm() {
   <label class="field"><span>Échéance</span><input id="d-due" type="date" value="${d.due}" oninput="App.d('due',this.value)"></label>
   <label class="field"><span>Type</span><select id="d-kind" onchange="App.d('kind',this.value)">${[['standard', 'Facture'], ['acompte', 'Acompte'], ['final', 'Facture finale de projet'], ['groupee', 'Facture groupée (plusieurs projets)']].map(([k, l]) => `<option value="${k}" ${d.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
   <label class="field"><span>TVA (%)</span><input id="d-tva" type="number" min="0" step="any" value="${d.tva}" oninput="App.d('tva',this.value)"></label></div>
-  <div class="field"><span>Lignes</span><div class="tbl-wrap"><table class="lines-ed"><tbody>${d.lines.map((l, k) => `<tr><td><input id="dl-l${k}" value="${esc(l.label)}" placeholder="Désignation" oninput="App.dl(${k},'label',this.value)"></td><td><input id="dl-q${k}" type="number" step="any" value="${l.qty}" aria-label="Quantité" oninput="App.dl(${k},'qty',this.value)" style="width:70px"></td><td><input id="dl-p${k}" type="number" step="any" value="${l.price}" aria-label="Prix unitaire" oninput="App.dl(${k},'price',this.value)" style="width:110px"></td><td><button class="icon-btn" aria-label="Retirer la ligne" onclick="App.delLine(${k})">×</button></td></tr>`).join('')}</tbody></table></div><button class="btn sm ghost" style="align-self:flex-start" onclick="App.addLine()">Ajouter une ligne</button></div>
+  <div class="field"><span>Lignes</span><div class="tbl-wrap"><table class="lines-ed"><tbody>${d.lines.map((l, k) => `<tr><td><input id="dl-l${k}" value="${esc(l.label)}" placeholder="Désignation" oninput="App.dl(${k},'label',this.value)"></td><td><input id="dl-q${k}" type="number" step="any" value="${l.qty}" aria-label="Quantité" oninput="App.dl(${k},'qty',this.value)" style="width:70px"></td><td><input id="dl-p${k}" type="number" step="any" value="${l.price}" aria-label="Prix unitaire" oninput="App.dl(${k},'price',this.value)" style="width:110px"></td><td><button class="icon-btn" aria-label="Retirer la ligne" onclick="App.delLine(${k})">×</button></td></tr>`).join('')}</tbody></table></div><div class="row"><button class="btn sm ghost" onclick="App.addLine()">Ajouter une ligne</button>${projLinePicker(d)}</div></div>
   <div class="form"><label class="field"><span>Remise</span><input id="d-dv" type="number" min="0" step="any" value="${d.discount.value}" oninput="App.dd('value',this.value)"></label>
   <label class="field"><span>Type de remise</span><select id="d-dt" onchange="App.dd('type',this.value)"><option value="pct" ${d.discount.type === 'pct' ? 'selected' : ''}>Pourcentage (%)</option><option value="fixed" ${d.discount.type === 'fixed' ? 'selected' : ''}>Montant (${esc(S.settings.currency)})</option></select></label>
   <label class="field full"><span>Note sur la facture (facultatif)</span><input id="d-notes" value="${esc(d.notes)}" oninput="App.d('notes',this.value)" placeholder="Merci pour votre confiance !"></label></div>
@@ -838,6 +857,9 @@ const upd = () => { const e = $('#d-tot'); if (e) e.innerHTML = draftTotals(tota
 function saveInvoice() {
   const d = draft; d.lines = d.lines.filter(l => l.label || +l.price).map(l => ({ label: l.label, qty: +l.qty || 0, price: +l.price || 0, ...(l.projectId ? { projectId: l.projectId } : {}) })); d.tva = +d.tva || 0; d.discount.value = +d.discount.value || 0;
   if (!d.lines.length) return toast('Ajoutez au moins une ligne.');
+  const lineProjects = [...new Set(d.lines.map(l => l.projectId).filter(Boolean))];
+  if (lineProjects.length) { d.projectIds = [...new Set([...(d.projectId ? [d.projectId] : []), ...lineProjects])]; if (!d.projectId) d.projectId = lineProjects[0]; }
+  if ((d.projectIds || []).length > 1 && d.kind !== 'acompte') d.kind = 'groupee';
   if (!d.id) { d.id = uid(); d.number = nextNumber(); S.invoices.push(d); log(d.projectId, `Facture ${d.number} créée`); }
   else { const k = S.invoices.findIndex(x => x.id === d.id); S.invoices[k] = d; log(d.projectId, `Facture ${d.number} modifiée`); }
   save(); closeModal(); go('invoice', d.id); toast('Facture enregistrée');
@@ -1434,7 +1456,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
