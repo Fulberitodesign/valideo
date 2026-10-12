@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Validéo · film motion design</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=block">
+<style>
+/* Film 1920×1080 piloté image par image par seek(t) : aucune animation CSS, tout est calculé (rendu déterministe). */
+html,body{margin:0;background:#070a12;overflow:hidden}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#070a12;font-family:"IBM Plex Sans",system-ui,sans-serif;color:#e8ecf4;-webkit-font-smoothing:antialiased}
+.abs{position:absolute}
+.blob{position:absolute;border-radius:50%;filter:blur(110px)}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse 75% 70% at 50% 48%,transparent 40%,rgba(0,0,0,.7));pointer-events:none;z-index:50}
+#grain{position:absolute;inset:0;opacity:.05;z-index:51;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#cam{position:absolute;inset:0;perspective:1700px;perspective-origin:50% 45%;transform-style:preserve-3d}
+.scene{position:absolute;left:50%;top:50%;transform-style:preserve-3d;opacity:0}
+.glass{background:linear-gradient(160deg,rgba(28,35,52,.86),rgba(15,19,30,.9));border:1px solid rgba(255,255,255,.1);box-shadow:0 50px 140px -30px rgba(0,0,0,.85),0 0 0 1px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.08);border-radius:30px}
+.eyebrow{font:600 18px "IBM Plex Sans";letter-spacing:.2em;color:#22d3ee;text-transform:uppercase}
+.h1{font:700 60px/1.1 Sora;letter-spacing:-1.5px;margin-top:14px}
+.meta{font:400 24px "IBM Plex Sans";color:#9aa5b8;margin-top:14px;display:flex;gap:16px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;font:600 19px "IBM Plex Sans"}
+.pill::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+.warn{background:rgba(251,191,36,.14);color:#fbbf24}.ok{background:rgba(74,222,128,.14);color:#4ade80}.info{background:rgba(129,140,248,.16);color:#a5b4fc}
+.mono{font-family:"IBM Plex Mono",monospace}
+.cursor{position:absolute;width:44px;height:44px;z-index:30;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+.ripple{position:absolute;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:3px solid rgba(34,211,238,.9);opacity:0}
+/* Étapes */
+.st-line{position:absolute;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.st-line i{display:block;height:100%;width:0;background:#4ade80;border-radius:3px}
+.st-dot{position:absolute;width:60px;height:60px;margin-left:-30px;border-radius:50%;display:grid;place-items:center;font:600 22px "IBM Plex Mono";color:#7f8aa0;background:#141a27;border:3px solid rgba(255,255,255,.14)}
+.st-dot svg{position:absolute;width:30px;height:30px}
+.st-lbl{position:absolute;width:220px;margin-left:-110px;text-align:center;font:500 21px "IBM Plex Sans";color:#7f8aa0}
+.caret{position:absolute;width:14px;height:14px;margin-left:-7px;border-right:3px solid #9aa5b8;border-bottom:3px solid #9aa5b8;transform:rotate(45deg);opacity:0}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="blob" id="b1" style="width:1150px;height:1150px;background:radial-gradient(circle,rgba(34,211,238,.42),transparent 64%)"></div>
+  <div class="blob" id="b2" style="width:1250px;height:1250px;background:radial-gradient(circle,rgba(99,102,241,.45),transparent 64%)"></div>
+  <div class="blob" id="b3" style="width:900px;height:900px;background:radial-gradient(circle,rgba(168,85,247,.25),transparent 64%)"></div>
+
+  <div id="cam">
+    <!-- 1. Logo -->
+    <div class="scene" id="s1" style="width:900px;height:300px">
+      <div class="abs" id="s1glow" style="left:0;top:-300px;width:900px;height:900px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.55),transparent 58%);filter:blur(30px)"></div>
+      <div class="abs" id="s1icon" style="left:360px;top:60px;width:180px;height:180px;background:linear-gradient(135deg,#0e9ab5,#4f46e5);box-shadow:0 30px 90px -10px rgba(34,211,238,.7),inset 0 2px 0 rgba(255,255,255,.25)">
+        <svg viewBox="0 0 180 180" width="180" height="180"><path id="s1check" d="M48 94 L80 126 L134 62" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>
+      </div>
+      <div class="abs" id="s1word" style="left:270px;top:66px;font:800 152px/1 Sora;letter-spacing:-5px;white-space:nowrap">Validéo</div>
+    </div>
+
+    <!-- 2. Projet et barre d'étapes -->
+    <div class="scene" id="s2" style="width:1560px;height:620px">
+      <div class="glass abs" style="inset:0;padding:58px 70px">
+        <div class="eyebrow">Projet · Maison Kora</div>
+        <div class="h1">Clip campagne automne</div>
+        <div class="meta">Livraison le 15 oct. · <span class="mono">2 400,00 € HT</span> <span class="pill warn">J-3</span></div>
+        <div class="abs" id="s2steps" style="left:70px;right:70px;top:330px;height:160px"></div>
+        <div class="abs" style="left:70px;right:70px;bottom:44px;display:flex;justify-content:space-between;font:500 22px 'IBM Plex Sans';color:#9aa5b8"><span id="s2cur">Étape 1 sur 6 · Brief</span><b class="mono" id="s2pct" style="color:#e8ecf4">0/6 · 0 %</b></div>
+      </div>
+      <div class="glass abs" id="s2toast" style="right:-70px;top:-64px;padding:22px 30px;border-radius:22px;display:flex;gap:18px;align-items:center;opacity:0">
+        <div style="width:54px;height:54px;border-radius:16px;background:rgba(74,222,128,.16);display:grid;place-items:center"><svg width="28" height="28" viewBox="0 0 28 28"><path d="M6 15 L11.5 20.5 L22 9" fill="none" stroke="#4ade80" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><div style="font:600 24px Sora">Montage V1 validé</div><div style="font:400 19px 'IBM Plex Sans';color:#9aa5b8;margin-top:4px">par Maison Kora · à l'instant</div></div>
+      </div>
+    </div>
+
+    <!-- 3. Révision d'un média -->
+    <div class="scene" id="s3" style="width:1440px;height:860px">
+      <div class="glass abs" style="inset:0">
+        <div class="abs" style="left:40px;top:34px;right:40px;display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;gap:18px;align-items:center"><span class="mono" style="font-size:16px;padding:5px 12px;border-radius:8px;background:rgba(34,211,238,.14);color:#e8ecf4;letter-spacing:.1em">VIDÉO</span><span style="font:700 34px Sora;letter-spacing:-.5px">Plan 14 · étalonnage</span></div>
+          <span class="pill info" id="s3ver">Version V1</span>
+        </div>
+        <div class="abs" id="s3img" style="left:40px;top:112px;width:1360px;height:700px;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#f6c28b 0%,#e58f65 55%,#5b3a4a 100%)">
+          <div class="abs" style="left:880px;top:250px;width:150px;height:150px;border-radius:50%;background:#ffe9be;box-shadow:0 0 120px 40px rgba(255,220,160,.6)"></div>
+          <svg class="abs" style="left:0;top:0" width="1360" height="700" viewBox="0 0 1360 700"><path d="M0 500 Q340 400 680 470 T1360 440 V700 H0Z" fill="#3a2633"/><path d="M0 560 Q400 500 760 560 T1360 540 V700 H0Z" fill="#2c1c27"/></svg>
+          <div class="abs" style="left:440px;top:360px;width:52px;height:170px;border-radius:14px 14px 0 0;background:#1e131a"></div>
+          <div class="abs" style="left:438px;top:318px;width:56px;height:56px;border-radius:50%;background:#1e131a"></div>
+          <div class="abs" style="left:0;top:0;right:0;height:62px;background:#000"></div>
+          <div class="abs" style="left:0;bottom:0;right:0;height:62px;background:#000;display:flex;justify-content:space-between;align-items:center;padding:0 34px;font:600 22px 'IBM Plex Mono';color:#fff"><span>PLAN 14 · EXT. JOUR</span><span>01:00:12:08</span></div>
+          <div class="abs" id="s3scrub" style="left:34px;right:34px;bottom:76px;height:8px;border-radius:4px;background:rgba(255,255,255,.25)"><i id="s3play" style="display:block;height:100%;width:38%;border-radius:4px;background:#22d3ee"></i></div>
+        </div>
+        <div class="abs" id="s3pin" style="left:505px;top:470px;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50% 50% 50% 0;background:#22d3ee;border:4px solid #fff;display:grid;place-items:center;font:700 22px 'IBM Plex Mono';color:#04161b;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0">1</div>
+        <div class="ripple" id="s3rip" style="left:505px;top:470px"></div>
+        <div class="glass abs" id="s3cmt" style="left:570px;top:380px;width:560px;padding:24px 28px;border-radius:22px;opacity:0">
+          <div style="display:flex;gap:14px;align-items:center"><span class="mono" style="font-size:18px;padding:5px 11px;border-radius:8px;background:rgba(34,211,238,.16)">01:00:12:08</span><b style="font:600 22px Sora">Maison Kora</b></div>
+          <div id="s3text" style="font:400 26px/1.4 'IBM Plex Sans';margin-top:14px;min-height:72px"></div>
+          <div id="s3done" style="margin-top:12px;opacity:0"><span class="pill ok">Corrigé dans la V2</span></div>
+        </div>
+        <svg class="cursor" id="s3cur" viewBox="0 0 24 24"><path d="M4 2 L4 19 L8.6 14.8 L11.6 21.5 L14.4 20.3 L11.5 13.8 L17.6 13.6 Z" fill="#fff" stroke="#0b1020" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+
+    <!-- 4. Le client valide -->
+    <div class="scene" id="s4" style="width:1240px;height:680px">
+      <div class="glass abs" style="inset:0;padding:54px 62px">
+        <div class="eyebrow">Espace client</div>
+        <div class="h1" style="font-size:52px">Bonjour Awa</div>
+        <div class="abs" style="left:62px;right:62px;top:236px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:24px 28px;border-radius:20px;background:rgba(255,255,255,.04)"><div><div style="font:600 27px Sora">Montage V1</div><div style="font:400 20px 'IBM Plex Sans';color:#9aa5b8;margin-top:4px">Terminée le 29 sept.</div></div><span class="pill ok">Validée</span></div>
+          <div style="position:relative;display:flex;justify-content:space-between;align-items:center;padding:24px 28px;border-radius:20px;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.28)"><div><div style="font:600 27px Sora">Retours client</div><div id="s4sub" style="font:600 20px 'IBM Plex Sans';color:#22d3ee;margin-top:4px">Prête : à vous de valider</div></div>
+            <div class="abs" id="s4btnwrap" style="right:28px;top:50%;margin-top:-32px;width:250px;height:64px"><div id="s4btn" style="position:absolute;inset:0;border-radius:16px;background:linear-gradient(135deg,#22d3ee,#6d8cf6);display:grid;place-items:center;font:600 23px 'IBM Plex Sans';color:#04161b;box-shadow:0 12px 34px -10px rgba(34,211,238,.8)">Valider l'étape</div><div id="s4ok" style="position:absolute;inset:0;border-radius:16px;background:#4ade80;display:grid;place-items:center;font:600 23px 'IBM Plex Sans';color:#06210f;opacity:0">Validée ✓</div></div>
+            </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:24px 28px;border-radius:20px;background:rgba(255,255,255,.04)"><div><div style="font:600 27px Sora">Étalonnage &amp; mixage</div><div style="font:400 20px 'IBM Plex Sans';color:#9aa5b8;margin-top:4px">En cours de réalisation</div></div><span class="pill info">En cours</span></div>
+        </div>
+        <div class="ripple" id="s4rip" style="left:1050px;top:388px;border-color:rgba(74,222,128,.9)"></div>
+        <svg class="cursor" id="s4cur" viewBox="0 0 24 24"><path d="M4 2 L4 19 L8.6 14.8 L11.6 21.5 L14.4 20.3 L11.5 13.8 L17.6 13.6 Z" fill="#fff" stroke="#0b1020" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+
+    <!-- 5. La facture -->
+    <div class="scene" id="s5" style="width:1500px;height:1000px">
+      <div class="abs" id="s5paper" style="left:0;top:0;width:800px;height:1000px;border-radius:10px;background:#fff;color:#1f2329;box-shadow:0 60px 160px -30px rgba(0,0,0,.85);overflow:hidden">
+        <div style="background:linear-gradient(135deg,#0e9ab5,#4f46e5);color:#fff;padding:54px 56px 44px;display:flex;justify-content:space-between">
+          <div><div style="font:700 30px Sora">Studio Lumière</div><div style="font:400 17px 'IBM Plex Sans';opacity:.85;margin-top:8px">12 rue des Créateurs · Paris</div></div>
+          <div style="text-align:right"><div style="font:800 44px Sora;letter-spacing:.06em">FACTURE</div><div class="mono" style="font-size:18px;margin-top:8px">N° FAC-2026-014</div></div>
+        </div>
+        <div style="padding:40px 56px">
+          <div style="display:flex;justify-content:space-between;font:400 18px 'IBM Plex Sans';color:#5c6470"><div><div style="font:600 13px 'IBM Plex Sans';letter-spacing:.14em;color:#7a828e">FACTURÉ À</div><b style="color:#1f2329;font-size:22px">Maison Kora</b></div><div style="text-align:right"><div style="font:600 13px 'IBM Plex Sans';letter-spacing:.14em;color:#7a828e">PROJET</div><b style="color:#1f2329;font-size:22px">Clip campagne automne</b></div></div>
+          <div style="margin-top:42px;border-top:3px solid #0e9ab5">
+            <div style="display:flex;justify-content:space-between;padding:20px 4px;border-bottom:1px solid #e6e8ec;font:400 22px 'IBM Plex Sans'"><span>Clip campagne automne — montage</span><span class="mono">2 400,00 €</span></div>
+            <div style="display:flex;justify-content:space-between;padding:20px 4px;border-bottom:1px solid #e6e8ec;font:400 22px 'IBM Plex Sans';color:#2b8a3e"><span>Acompte déjà facturé</span><span class="mono">− 720,00 €</span></div>
+          </div>
+          <div style="margin:40px 0 0 auto;width:400px;border-top:3px solid #0e9ab5;padding-top:18px;display:flex;justify-content:space-between;font:700 32px Sora"><span>Total</span><span id="s5total" class="mono">0,00 €</span></div>
+        </div>
+        <svg class="abs" id="s5stamp" style="left:470px;top:690px;width:250px;height:250px;opacity:0" viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="#2b8a3e" stroke-width="7"/><circle cx="100" cy="100" r="76" fill="none" stroke="#2b8a3e" stroke-width="2.5"/><text x="100" y="114" text-anchor="middle" font-family="Sora" font-weight="800" font-size="42" fill="#2b8a3e" letter-spacing="3">PAYÉE</text></svg>
+      </div>
+      <div class="glass abs" style="left:900px;top:220px;width:560px;padding:38px 40px;border-radius:26px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 28px Sora">Facture finale</span><span class="abs" style="right:40px;top:40px"><span class="pill warn" id="s5p1">À vérifier</span><span class="pill info abs" id="s5p2" style="right:0;top:0;opacity:0;white-space:nowrap">Envoyée</span><span class="pill ok abs" id="s5p3" style="right:0;top:0;opacity:0">Payée</span></span></div>
+        <div style="font:400 20px/1.5 'IBM Plex Sans';color:#9aa5b8;margin-top:16px">Générée à la fin du projet, acompte déduit.</div>
+        <div style="display:flex;justify-content:space-between;margin-top:26px;font:600 24px 'IBM Plex Sans'"><span>Reste à payer</span><span class="mono" id="s5due">1 680,00 €</span></div>
+        <div id="s5btn" style="margin-top:30px;height:66px;border-radius:16px;background:linear-gradient(135deg,#22d3ee,#6d8cf6);display:grid;place-items:center;font:600 23px 'IBM Plex Sans';color:#04161b;box-shadow:0 12px 34px -10px rgba(34,211,238,.8)">Valider et envoyer</div>
+        <div class="ripple" id="s5rip" style="left:280px;top:267px"></div>
+        <svg class="cursor" id="s5cur" viewBox="0 0 24 24"><path d="M4 2 L4 19 L8.6 14.8 L11.6 21.5 L14.4 20.3 L11.5 13.8 L17.6 13.6 Z" fill="#fff" stroke="#0b1020" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Éléments d'écran (hors caméra) -->
+  <div class="glass abs" id="notif" style="left:1290px;top:64px;width:560px;padding:24px 28px;border-radius:24px;display:flex;gap:18px;align-items:center;opacity:0;z-index:40">
+    <div style="width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,rgba(34,211,238,.25),rgba(99,102,241,.25));display:grid;place-items:center;font:700 22px Sora">MK</div>
+    <div><div style="font:600 23px Sora">Maison Kora a validé</div><div style="font:400 20px 'IBM Plex Sans';color:#9aa5b8;margin-top:4px">« Retours client » · à l'instant</div></div>
+  </div>
+  <div class="abs" id="over5" style="left:0;right:0;top:70px;text-align:center;font:600 22px 'IBM Plex Sans';letter-spacing:.24em;color:#22d3ee;opacity:0;z-index:40">PROJET TERMINÉ · FACTURE PRÊTE</div>
+
+  <svg class="abs" id="streak" style="left:0;top:0;z-index:41" width="1920" height="1080" viewBox="0 0 1920 1080">
+    <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs>
+    <path id="sk1" d="M640 520 C 760 600 820 660 900 720" fill="none" stroke="url(#sg)" stroke-width="12" stroke-linecap="round" filter="url(#glow)" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+    <path id="sk2" d="M900 720 C 1020 560 1140 420 1290 300" fill="none" stroke="url(#sg)" stroke-width="12" stroke-linecap="round" filter="url(#glow)" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+  </svg>
+  <div class="abs" id="tag" style="left:0;right:0;top:405px;text-align:center;z-index:42;opacity:0">
+    <div id="tag1" style="font:800 118px/1.08 Sora;letter-spacing:-3.5px">Tes clients valident.</div>
+    <div id="tag2" style="font:800 118px/1.08 Sora;letter-spacing:-3.5px;background:linear-gradient(100deg,#22d3ee,#818cf8);-webkit-background-clip:text;background-clip:text;color:transparent">Tu factures.</div>
+  </div>
+  <div class="abs" id="end" style="left:0;right:0;top:340px;text-align:center;z-index:42;opacity:0">
+    <div style="display:inline-flex;align-items:center;gap:40px">
+      <div id="endicon" style="width:150px;height:150px;border-radius:40px;background:linear-gradient(135deg,#0e9ab5,#4f46e5);box-shadow:0 30px 90px -10px rgba(34,211,238,.7),inset 0 2px 0 rgba(255,255,255,.25);display:grid;place-items:center"><svg viewBox="0 0 180 180" width="150" height="150"><path d="M48 94 L80 126 L134 62" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div id="endword" style="font:800 140px/1 Sora;letter-spacing:-5px">Validéo</div>
+    </div>
+    <div id="endsub" style="font:500 32px 'IBM Plex Sans';color:#9aa5b8;margin-top:46px">Suivi de projets · Validation client · Facturation</div>
+    <div id="endurl" style="margin-top:34px"><span style="display:inline-block;padding:12px 28px;border-radius:999px;border:1px solid rgba(255,255,255,.14);font:500 24px 'IBM Plex Mono';color:#e8ecf4;background:rgba(255,255,255,.04)">Commence gratuitement</span></div>
+  </div>
+  <div id="flash" class="abs" style="inset:0;background:radial-gradient(circle at 50% 50%,rgba(34,211,238,.35),transparent 60%);opacity:0;z-index:45"></div>
+  <div id="vig"></div><div id="grain"></div>
+  <div id="fade" class="abs" style="inset:0;background:#070a12;opacity:0;z-index:60"></div>
+</div>
+
+<script>
+const DURATION = 22;
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const E = {
+  lin: t => t,
+  outExpo: t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t),
+  inExpo: t => t <= 0 ? 0 : Math.pow(2, 10 * t - 10),
+  outCubic: t => 1 - Math.pow(1 - t, 3),
+  inCubic: t => t * t * t,
+  inOutCubic: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  inOutQuint: t => t < .5 ? 16 * t ** 5 : 1 - Math.pow(-2 * t + 2, 5) / 2,
+  inQuint: t => t ** 5,
+  outQuint: t => 1 - Math.pow(1 - t, 5),
+  inOutSine: t => -(Math.cos(Math.PI * t) - 1) / 2,
+  outBack: t => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+};
+const P = (t, a, b, e = E.outExpo) => e(clamp((t - a) / (b - a)));
+// Fenêtre d'apparition : entrée [a,b], sortie [c,d]
+const W = (t, a, b, c, d, ei = E.outCubic, eo = E.inCubic) => t < c ? P(t, a, b, ei) : 1 - P(t, c, d, eo);
+const tf = o => `translate(-50%,-50%) translate3d(${o.x || 0}px,${o.y || 0}px,${o.z || 0}px) rotateX(${o.rx || 0}deg) rotateY(${o.ry || 0}deg) rotateZ(${o.rz || 0}deg) scale(${o.s ?? 1})`;
+// Flou de mouvement : proportionnel à la vitesse de la caméra
+function speed(f, t) { const a = f(t), b = f(t + 1 / 120); return Math.abs(b.x - a.x) + Math.abs(b.y - a.y) + Math.abs((b.z || 0) - (a.z || 0)) * .35 + (Math.abs((b.rx || 0) - (a.rx || 0)) + Math.abs((b.ry || 0) - (a.ry || 0))) * 18 + Math.abs((b.s ?? 1) - (a.s ?? 1)) * 900; }
+function place(id, f, t, extraBlur = 0) {
+  const el = $(id), o = f(t), blur = Math.min(16, speed(f, t) * .085) + extraBlur;
+  el.style.transform = tf(o); el.style.opacity = clamp(o.o ?? 1); el.style.filter = blur > .25 ? `blur(${blur.toFixed(2)}px)` : 'none';
+  el.style.visibility = (o.o ?? 1) <= 0.001 ? 'hidden' : 'visible';
+}
+const set = (id, css) => Object.assign($(id).style, css);
+const bez = (p0, p1, p2, k) => [ (1 - k) ** 2 * p0[0] + 2 * (1 - k) * k * p1[0] + k * k * p2[0], (1 - k) ** 2 * p0[1] + 2 * (1 - k) * k * p1[1] + k * k * p2[1] ];
+const eur = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+/* ---- Construction de la barre d'étapes ---- */
+const STEPS = ['Brief', 'Dérushage', 'Montage V1', 'Retours client', 'Étalonnage', 'Livraison'];
+const DONE = [3.05, 3.5, 3.95, 4.4, 4.85];
+(function buildSteps() {
+  const host = $('s2steps'), W_ = 1420, gap = W_ / STEPS.length;
+  let h = '';
+  STEPS.forEach((l, i) => {
+    const cx = gap * i + gap / 2;
+    if (i) h += `<div class="st-line" style="left:${cx - gap + 38}px;width:${gap - 76}px;top:27px"><i id="ln${i}"></i></div>`;
+    h += `<div class="caret" id="ca${i}" style="left:${cx}px;top:-26px"></div><div class="st-dot" id="dt${i}" style="left:${cx}px;top:0"><span id="nb${i}">${i + 1}</span><svg viewBox="0 0 30 30"><path id="ck${i}" d="M7 15.5 L12.5 21 L23 9.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg></div><div class="st-lbl" id="lb${i}" style="left:${cx}px;top:82px">${l}</div>`;
+  });
+  host.innerHTML = h;
+})();
+
+/* ---- Mouvements de caméra par scène ---- */
+const C1 = t => {
+  const push = P(t, 2.0, 2.65, E.inQuint);
+  return { s: lerp(1, 3.4, push), z: lerp(0, 400, push), o: 1 - P(t, 2.25, 2.62, E.inCubic) };
+};
+const C2 = t => {
+  const enter = P(t, 2.25, 3.45, E.outQuint), drift = P(t, 3.3, 5.9, E.inOutSine), exit = P(t, 5.78, 6.38, E.inQuint);
+  return { x: lerp(0, -2300, exit), y: lerp(260, 30, enter) - drift * 18, z: lerp(-1100, 0, enter) + drift * 60, rx: lerp(42, 14, enter) - drift * 6, ry: lerp(-30, -9, enter) + drift * 15 + exit * 38, rz: lerp(-4, 0, enter), o: P(t, 2.25, 2.7, E.outCubic) };
+};
+const C3 = t => {
+  const enter = P(t, 6.15, 7.1, E.outQuint), drift = P(t, 7.0, 9.4, E.inOutSine), exit = P(t, 9.35, 9.95, E.inQuint);
+  return { x: lerp(2300, 0, enter) - drift * 40, y: lerp(0, 20, enter) - exit * 1500, z: lerp(-300, 0, enter) + drift * 80, rx: 6 - drift * 3 - exit * 50, ry: lerp(-38, -7, enter) + drift * 9, o: P(t, 6.15, 6.4) * (1 - P(t, 9.75, 9.95)) };
+};
+const C4 = t => {
+  const enter = P(t, 9.75, 10.7, E.outQuint), drift = P(t, 10.6, 12.6, E.inOutSine), exit = P(t, 12.55, 13.15, E.inQuint);
+  return { x: drift * -30, y: lerp(1300, 10, enter), z: lerp(-500, 0, enter) + drift * 90 + exit * 1300, rx: lerp(-48, 10, enter) - drift * 4, ry: 12 - drift * 18, o: P(t, 9.75, 10.1) * (1 - P(t, 12.8, 13.15)) };
+};
+const C5 = t => {
+  const enter = P(t, 13.05, 14.25, E.outQuint), drift = P(t, 14.1, 16.6, E.inOutSine), exit = P(t, 16.55, 17.1, E.inQuint);
+  return { x: lerp(0, -40, drift), y: lerp(900, 30, enter) + drift * -16, z: lerp(-900, 0, enter) + drift * 70 - exit * 2600, rx: lerp(52, 12, enter) - drift * 5 + exit * 10, ry: lerp(22, -10, enter) + drift * 14, s: .82, o: P(t, 13.05, 13.4) * (1 - P(t, 16.75, 17.1)) };
+};
+
+/* ---- Rendu d'une image au temps t (secondes) ---- */
+function seek(t) {
+  // Fond : halos qui dérivent lentement
+  set('b1', { left: (180 + Math.sin(t * .35) * 220) + 'px', top: (-260 + Math.cos(t * .3) * 140) + 'px' });
+  set('b2', { left: (900 + Math.cos(t * .28) * 260) + 'px', top: (180 + Math.sin(t * .33) * 160) + 'px' });
+  set('b3', { left: (200 + Math.sin(t * .22 + 1) * 300) + 'px', top: (520 + Math.cos(t * .25) * 120) + 'px' });
+
+  /* 1. Logo */
+  place('s1', C1, t);
+  const pop = P(t, .25, 1.0, E.outBack), shift = P(t, 1.15, 1.85, E.inOutQuint);
+  set('s1icon', { transform: `translateX(${lerp(0, -300, shift)}px) scale(${lerp(.1, 1, pop)})`, borderRadius: lerp(90, 46, P(t, .35, .95, E.outCubic)) + 'px', opacity: P(t, .05, .3) });
+  set('s1glow', { opacity: P(t, 0, .9, E.outCubic) * (1 - .5 * shift), transform: `translateX(${-300 * shift}px) scale(${lerp(.4, 1, P(t, 0, 1.2))})` });
+  $('s1check').setAttribute('stroke-dashoffset', 100 - 100 * P(t, .7, 1.2, E.inOutCubic));
+  const rev = P(t, 1.3, 2.0, E.outQuint);
+  set('s1word', { clipPath: `inset(-20% ${100 - rev * 100}% -20% 0)`, transform: `translateX(${lerp(-60, 0, rev)}px)`, filter: `blur(${(1 - rev) * 14}px)`, opacity: rev > 0 ? 1 : 0 });
+
+  /* 2. Projet : les étapes passent au vert */
+  place('s2', C2, t);
+  let done = 0;
+  STEPS.forEach((_, i) => {
+    const d = DONE[i], k = d ? P(t, d, d + .35, E.outBack) : 0, isDone = d && t >= d;
+    if (isDone) done++;
+    if (i) $('ln' + i).style.width = (DONE[i - 1] ? P(t, DONE[i - 1] - .05, DONE[i - 1] + .4, E.inOutCubic) * 100 : 0) + '%';
+    const cur = !isDone && (i === 0 || (DONE[i - 1] && t >= DONE[i - 1] + .2)) && done === i;
+    const dot = $('dt' + i);
+    dot.style.background = isDone ? '#4ade80' : cur ? '#22d3ee' : '#141a27';
+    dot.style.borderColor = isDone ? '#4ade80' : cur ? '#22d3ee' : 'rgba(255,255,255,.14)';
+    dot.style.boxShadow = isDone ? `0 0 ${30 * (1 - P(t, d + .2, d + .9))}px rgba(74,222,128,.8)` : cur ? '0 0 0 9px rgba(34,211,238,.16)' : 'none';
+    dot.style.transform = `scale(${isDone ? lerp(.7, 1, k) : 1})`;
+    $('nb' + i).style.opacity = isDone ? 0 : 1; $('nb' + i).style.color = cur ? '#04161b' : '#7f8aa0';
+    $('ck' + i).setAttribute('stroke-dashoffset', isDone ? 100 - 100 * P(t, d + .05, d + .4, E.outCubic) : 100);
+    $('lb' + i).style.color = isDone || cur ? '#e8ecf4' : '#7f8aa0';
+    $('ca' + i).style.opacity = cur ? 1 : 0;
+  });
+  const cur = Math.min(done, STEPS.length - 1);
+  $('s2cur').textContent = `Étape ${cur + 1} sur ${STEPS.length} · ${STEPS[cur]}`;
+  $('s2pct').textContent = `${done}/${STEPS.length} · ${Math.round(done / STEPS.length * 100)} %`;
+  const tk = W(t, 4.05, 4.5, 5.5, 5.8, E.outBack);
+  set('s2toast', { opacity: clamp(tk), transform: `translate3d(0,${lerp(-30, 0, clamp(tk))}px,140px) scale(${lerp(.85, 1, clamp(tk))})` });
+
+  /* 3. Révision : clic, épingle, commentaire */
+  place('s3', C3, t);
+  const mv = P(t, 6.9, 7.65, E.inOutCubic), away = P(t, 8.25, 8.9, E.inOutCubic);
+  let [cx, cy] = bez([1260, 800], [900, 760], [512, 476], mv); cx = lerp(cx, 1180, away); cy = lerp(cy, 760, away);
+  const press = t > 7.62 && t < 7.78 ? .82 : 1;
+  set('s3cur', { left: cx + 'px', top: cy + 'px', opacity: P(t, 6.8, 7.0) * (1 - P(t, 8.7, 8.9)), transform: `scale(${press})` });
+  const rp = P(t, 7.68, 8.25, E.outCubic);
+  set('s3rip', { opacity: t > 7.68 ? (1 - rp) : 0, transform: `scale(${lerp(.3, 1.6, rp)})` });
+  const pk = P(t, 7.72, 8.1, E.outBack), fixed = P(t, 9.0, 9.3, E.outCubic);
+  set('s3pin', { opacity: P(t, 7.72, 7.8), transform: `scale(${pk})`, background: fixed > .5 ? '#4ade80' : '#22d3ee' });
+  const ck = P(t, 7.9, 8.3, E.outQuint);
+  set('s3cmt', { opacity: ck, transform: `translate3d(${lerp(-30, 0, ck)}px,${lerp(16, 0, ck)}px,60px) scale(${lerp(.92, 1, ck)})` });
+  const msg = 'On peut remonter un peu les ombres ici ?', n = Math.floor(msg.length * P(t, 8.05, 8.95, E.lin));
+  $('s3text').innerHTML = msg.slice(0, n) + (t > 8.0 && t < 9.2 && Math.floor(t * 3) % 2 === 0 ? '<span style="color:#22d3ee">|</span>' : '');
+  set('s3done', { opacity: fixed, transform: `translateY(${(1 - fixed) * 10}px)` });
+  $('s3ver').textContent = t > 9.0 ? 'Version V2' : 'Version V1';
+  $('s3play').style.width = (38 + 30 * P(t, 6.2, 7.6, E.inOutSine)) + '%';
+
+  /* 4. Le client valide l'étape */
+  place('s4', C4, t);
+  const m4 = P(t, 10.55, 11.2, E.inOutCubic);
+  let [qx, qy] = bez([700, 640], [880, 600], [1060, 396], m4);
+  const press4 = t > 11.18 && t < 11.32 ? .82 : 1;
+  set('s4cur', { left: qx + 'px', top: qy + 'px', opacity: P(t, 10.4, 10.6) * (1 - P(t, 12.3, 12.5)), transform: `scale(${press4})` });
+  const okk = P(t, 11.25, 11.6, E.outCubic), rp4 = P(t, 11.25, 11.85, E.outCubic);
+  set('s4ok', { opacity: okk, transform: `scale(${lerp(.9, 1, okk)})` });
+  set('s4btn', { opacity: 1 - okk });
+  set('s4rip', { opacity: t > 11.25 ? 1 - rp4 : 0, transform: `scale(${lerp(.4, 2.2, rp4)})` });
+  $('s4sub').textContent = t > 11.3 ? 'Validée par vous à l\'instant' : 'Prête : à vous de valider';
+  $('s4sub').style.color = t > 11.3 ? '#4ade80' : '#22d3ee';
+  const nt = W(t, 11.55, 12.05, 12.75, 13.1, E.outQuint);
+  set('notif', { opacity: clamp(nt), transform: `translate(${(1 - clamp(nt)) * 140}px,0) scale(${lerp(.94, 1, clamp(nt))})`, filter: nt < .98 ? `blur(${(1 - nt) * 8}px)` : 'none' });
+
+  /* 5. La facture se génère, part et se fait payer */
+  place('s5', C5, t);
+  set('over5', { opacity: W(t, 13.15, 13.6, 16.3, 16.7), transform: `translateY(${(1 - P(t, 13.15, 13.7)) * 16}px)`, letterSpacing: lerp(.4, .24, P(t, 13.15, 14)) + 'em' });
+  $('s5total').textContent = eur(Math.round(1680 * P(t, 13.9, 14.8, E.outCubic) * 100) / 100);
+  const m5 = P(t, 14.55, 15.15, E.inOutCubic);
+  let [vx, vy] = bez([420, 520], [380, 440], [290, 274], m5);
+  const press5 = t > 15.12 && t < 15.26 ? .82 : 1;
+  set('s5cur', { left: vx + 'px', top: vy + 'px', opacity: P(t, 14.4, 14.6) * (1 - P(t, 16.1, 16.3)), transform: `scale(${press5})` });
+  const rp5 = P(t, 15.18, 15.8, E.outCubic);
+  set('s5rip', { opacity: t > 15.18 ? 1 - rp5 : 0, transform: `scale(${lerp(.4, 2.2, rp5)})` });
+  set('s5p1', { opacity: 1 - P(t, 15.2, 15.4) });
+  set('s5p2', { opacity: P(t, 15.25, 15.45) * (1 - P(t, 15.9, 16.05)) });
+  set('s5p3', { opacity: P(t, 15.95, 16.15), transform: `scale(${lerp(.7, 1, P(t, 15.95, 16.3, E.outBack))})` });
+  $('s5due').textContent = t > 15.95 ? '0,00 €' : '1 680,00 €'; $('s5due').style.color = t > 15.95 ? '#4ade80' : '#e8ecf4';
+  const sp = P(t, 15.85, 16.15, E.outCubic);
+  set('s5stamp', { opacity: sp * .9, transform: `rotate(${lerp(-30, -14, sp)}deg) scale(${lerp(2.4, 1, sp)})` });
+
+  /* 6. Traînées de lumière en forme de coche, puis slogan */
+  const d1 = P(t, 16.85, 17.35, E.inOutCubic), d2 = P(t, 17.25, 17.85, E.inOutCubic), fadeSk = P(t, 18.0, 18.35, E.inCubic);
+  $('sk1').setAttribute('stroke-dashoffset', 100 - d1 * 100); $('sk2').setAttribute('stroke-dashoffset', 100 - d2 * 100);
+  set('streak', { opacity: (t > 16.8 ? 1 : 0) * (1 - fadeSk), transform: `scale(${lerp(1, 1.25, fadeSk)})`, transformOrigin: '900px 600px' });
+  set('flash', { opacity: W(t, 17.8, 18.0, 18.0, 18.5, E.outCubic, E.outCubic) * .9 });
+  const g1 = P(t, 18.05, 18.65, E.outQuint), g2 = P(t, 18.4, 19.0, E.outQuint), gout = P(t, 19.7, 20.15, E.inCubic);
+  set('tag', { opacity: t > 18.0 ? 1 - gout : 0, transform: `scale(${lerp(1, 1.06, P(t, 18, 20.2, E.lin))})`, filter: gout > 0 ? `blur(${gout * 18}px)` : 'none' });
+  set('tag1', { opacity: g1, transform: `translateY(${(1 - g1) * 50}px)`, filter: `blur(${(1 - g1) * 14}px)` });
+  set('tag2', { opacity: g2, transform: `translateY(${(1 - g2) * 50}px)`, filter: `blur(${(1 - g2) * 14}px)` });
+
+  /* 7. Carte de fin */
+  const e1 = P(t, 20.05, 20.75, E.outBack), e2 = P(t, 20.3, 21.0, E.outQuint), e3 = P(t, 20.55, 21.2, E.outQuint);
+  set('end', { opacity: t > 20 ? 1 : 0 });
+  set('endicon', { transform: `scale(${e1})`, opacity: P(t, 20.05, 20.2) });
+  set('endword', { clipPath: `inset(-20% ${100 - e2 * 100}% -20% 0)`, filter: `blur(${(1 - e2) * 12}px)` });
+  set('endsub', { opacity: e3, transform: `translateY(${(1 - e3) * 20}px)` });
+  set('endurl', { opacity: P(t, 20.8, 21.3), transform: `translateY(${(1 - P(t, 20.8, 21.3)) * 16}px)` });
+  set('fade', { opacity: P(t, 0, .01) < 1 ? 1 : P(t, DURATION - .45, DURATION, E.inCubic) });
+}
+window.seek = seek; window.DURATION = DURATION;
+document.fonts.ready.then(() => { const q = new URLSearchParams(location.search); seek(+(q.get('t') || 0)); window.__ready = true; });
+</script>
+</body>
+</html>

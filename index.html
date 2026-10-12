@@ -33,6 +33,9 @@
 .hero .fine{font-size:13.5px;color:var(--dim);display:flex;gap:8px 18px;flex-wrap:wrap;justify-content:center}
 .hero .fine span::before{content:"✓ ";color:var(--ok)}
 .hero-shot{margin-top:40px;width:100%;max-width:1080px;position:relative}
+.film{padding:8px}
+.film video{display:block;width:100%;height:auto;border-radius:12px;background:#070a12;aspect-ratio:16/9}
+.film-sound{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 26px;border-radius:999px;border:1px solid var(--edge);background:var(--glass-strong);color:var(--fg);font:600 15px var(--f-body);cursor:pointer}
 .hero-shot::before{content:"";position:absolute;inset:-12% -6% auto;height:70%;background:radial-gradient(closest-side,rgba(34,211,238,.25),transparent);filter:blur(30px);z-index:-1}
 .tc-chip{position:absolute;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;font-size:13.5px;text-align:left}
 .tc-chip b{display:block;font-weight:600}
@@ -134,9 +137,8 @@
       <div class="ctas"><a class="btn primary" href="app.html#inscription">Commencer gratuitement</a><a class="btn" href="app.html?demo">Essayer la démo</a><a class="btn" href="guide.html">Guide d'utilisation</a></div>
       <div class="fine"><span>Fonctionne hors ligne</span><span>Lien client sans inscription</span><span>Factures à ton image</span></div>
       <div class="hero-shot">
-        <div class="shot glass"><div class="bar"><i></i><i></i><i></i></div><img src="guide/img/hero.png" alt="Tableau de bord de Validéo : projets en cours, factures à encaisser, alertes de retard et retours clients à traiter" width="1600" height="1000"></div>
-        <div class="tc-chip glass tc-a"><span class="dot">✓</span><span><b>Montage V1 validé</b><small>par Maison Kora · 50 %</small></span></div>
-        <div class="tc-chip glass tc-b"><span class="dot">TC</span><span><b>01:00:12:08</b><small>« Remonter les ombres ici »</small></span></div>
+        <div class="shot glass film"><video id="film" autoplay muted loop playsinline preload="auto" poster="media/valideo-poster.jpg" width="1920" height="1080" aria-label="Film de présentation de Validéo : un projet dont les étapes passent au vert, un commentaire posé au timecode, le client qui valide, puis la facture générée et payée"><source src="media/valideo-film.mp4" type="video/mp4"></video>
+          <button class="film-sound" id="filmPlay" type="button" hidden>Lire le film</button></div>
       </div>
       <div class="strip" aria-label="Formats pris en charge"><span>V1 → V2 → finale</span><span>HH:MM:SS:II · 25 i/s</span><span>Email · WhatsApp</span><span>€ · FCFA · $</span><span>PDF A4</span></div>
     </div>
@@ -278,6 +280,11 @@
   <div class="wrap"><span>© 2026 Validéo · Suivi de projets vidéo</span><span><a href="#offres">Tarifs</a><a href="guide.html">Guide d'utilisation</a><a href="app.html">Ouvrir l'outil</a><a href="#faq">FAQ</a></span></div>
 </footer>
 <script>
+  // Film : respecte « réduire les animations » ; bouton de lecture si le navigateur bloque la lecture auto
+  (function () { const v = document.getElementById('film'), b = document.getElementById('filmPlay'); if (!v) return;
+    const show = () => { b.hidden = false; }; b.onclick = () => { v.play(); b.hidden = true; v.controls = true; };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); show(); }
+    else v.play().catch(show); })();
   function setPeriod(p) {
     document.querySelectorAll('.period button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
     document.querySelectorAll('[data-m]').forEach(el => { el.textContent = el.dataset[p]; });
