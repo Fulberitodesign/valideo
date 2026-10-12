@@ -176,7 +176,7 @@ async function startPayment() {
       throw new Error(msg || error?.message || 'Paiement indisponible');
     }
     location.href = data.checkout_url;
-  } catch (e) { toast('Paiement impossible : ' + e.message); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
+  } catch (e) { const m = /no payment methods/i.test(e.message) ? (payChoice.method === 'card' ? 'le paiement par carte n’est pas encore activé. Choisis Mobile Money ou réessaie plus tard.' : 'le Mobile Money n’est pas encore activé. Choisis la carte bancaire ou réessaie plus tard.') : e.message; toast('Paiement impossible : ' + m); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
 }
 /* Retour depuis la page de paiement : on attend la confirmation du serveur */
 async function watchPayment(pid) {
@@ -351,8 +351,8 @@ function navHTML() {
   }
   const parent = { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
   const nA = alerts().filter(a => a.lvl !== 'info').length, nV = S.invoices.filter(i => i.status === 'a_verifier').length;
-  const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['settings', 'Identité & réglages']];
-  if (user) items.splice(items.length - 1, 0, ['plan', 'Mon offre']);
+  const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['settings', 'Mon profil']];
+  if (user) items.push(['plan', 'Mon offre']);
   if (profile?.is_admin) items.push(['admin', 'Administration']);
   return items.map(([k, l, n]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
 }
@@ -643,7 +643,7 @@ function pSettings() {
   const st = S.settings;
   const f = (k, l, type = 'text', full = false) => `<label class="field ${full ? 'full' : ''}"><span>${l}</span><input id="s-${k}" type="${type}" value="${esc(st[k])}" oninput="App.setS('${k}',this.value)"></label>`;
   const ta = (k, l) => `<label class="field full"><span>${l}</span><textarea id="s-${k}" rows="3" oninput="App.setS('${k}',this.value)">${esc(st[k])}</textarea></label>`;
-  return `<div class="ph"><div><h1>Identité & réglages</h1><div class="meta">Vos factures reprennent automatiquement votre logo, vos couleurs, votre signature et votre cachet.</div></div></div>
+  return `<div class="ph"><div><h1>Mon profil</h1><div class="meta">Vos factures reprennent automatiquement votre logo, vos couleurs, votre signature et votre cachet.</div></div></div>
   <div class="set-layout"><div class="stack">
   ${user ? "" : accountCard()}
   <section class="card"><h2>Votre entreprise</h2><div class="form">${f('name', 'Nom commercial')}${f('owner', 'Votre nom')}${f('email', 'Email', 'email')}${f('phone', 'Téléphone / WhatsApp', 'tel')}${ta('address', 'Adresse')}${f('siret', 'N° SIRET / RCCM / NIF', 'text', true)}${ta('iban', 'Coordonnées de paiement (IBAN, Mobile Money…)')}${ta('legal', 'Mentions légales en pied de facture')}</div></section>
