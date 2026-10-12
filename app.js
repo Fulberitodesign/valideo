@@ -303,6 +303,12 @@ function cAvatar(c, px) {
   const st = px ? ` style="width:${px}px;height:${px}px;font-size:${Math.round(px * .35)}px"` : '';
   return c?.logo ? `<span class="avatar has-img"${st}><img src="${c.logo}" alt=""></span>` : `<span class="avatar"${st}>${initials(cname(c))}</span>`;
 }
+/* Photo de profil du prestataire : celle importée, sinon celle du compte Google */
+const myPhoto = () => S.settings.avatar || (MODE !== 'portal' && user?.user_metadata?.avatar_url) || '';
+function meAvatar(px) {
+  const ph = myPhoto(), st = ` style="width:${px}px;height:${px}px;font-size:${Math.round(px * .38)}px"`;
+  return ph ? `<span class="avatar has-img"${st}><img src="${esc(ph)}" alt="" referrerpolicy="no-referrer"></span>` : `<span class="avatar"${st}>${initials(S.settings.owner || S.settings.name || user?.email || '?')}</span>`;
+}
 function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
 
 /* ---------------- Calculs ---------------- */
@@ -443,6 +449,8 @@ function renderPage() {
   }
   $('#main').innerHTML = html;
   $('#sync').innerHTML = syncChip(); $('#sync').hidden = MODE === 'portal';
+  const mc = $('#meChip');
+  if (mc) { const show = MODE !== 'portal' && isOwner(); mc.hidden = !show; if (show) mc.innerHTML = `${meAvatar(26)}<span>${esc((S.settings.owner || S.settings.name || 'Mon profil').split(' ')[0])}</span>`; }
   const pc = $('#planChip');
   if (pc) { const show = MODE !== 'portal' && isOwner() && !!user && !!profile; pc.hidden = !show;
     if (show) { const cur = profile.is_admin ? null : myPlan(); pc.innerHTML = profile.is_admin ? '<b>Administrateur</b>' : cur === PLANS.decouverte ? 'Offre <b>Découverte</b> · <span class="up">Passer à Pro</span>' : `Offre <b>${cur.name}</b>${profile.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`; } }
@@ -501,7 +509,7 @@ function pClient(id) {
   const c = client(id); if (!c) return nf(); const own = isOwner(); const s = clientStats(id);
   const invs = S.invoices.filter(i => i.clientId === id && (own || isSent(i))).sort((a, b) => b.date.localeCompare(a.date));
   return `${own ? `<div class="crumbs"><a onclick="App.go('clients')">Clients</a> /</div>` : ''}
-  <div class="ph"><div class="row" style="gap:14px">${cAvatar(c, 52)}<div><h1>${own ? esc(cname(c)) : 'Bonjour ' + esc((c.name || '').split(' ')[0])}</h1><div class="meta">${own ? `${c.company ? esc(c.name) + ' · ' : ''}<span class="mono small">${esc(c.email || '')}</span> <span class="mono small">${esc(c.phone || '')}</span>` : `Vos projets avec ${esc(S.settings.name)}`}</div></div></div>
+  <div class="ph"><div class="row" style="gap:14px">${cAvatar(c, 52)}<div><h1>${own ? esc(cname(c)) : 'Bonjour ' + esc((c.name || '').split(' ')[0])}</h1><div class="meta">${own ? `${c.company ? esc(c.name) + ' · ' : ''}<span class="mono small">${esc(c.email || '')}</span> <span class="mono small">${esc(c.phone || '')}</span>` : `<span class="row" style="gap:8px;display:inline-flex">${S.settings.avatar ? meAvatar(24) : ''}Vos projets avec ${esc(S.settings.owner && S.settings.owner !== S.settings.name ? S.settings.owner + ' · ' + S.settings.name : S.settings.name)}</span>`}</div></div></div>
   ${own ? `<div class="row"><button class="btn" onclick="App.editClient('${c.id}')">Modifier</button><button class="btn" onclick="App.editInvoice(null,{clientId:'${c.id}',free:true})">Facture sans projet</button><button class="btn" onclick="App.groupInvoice('${c.id}')">Facture groupée</button><button class="btn primary" onclick="App.editProject(null,'${c.id}')">Nouveau projet</button></div>` : ''}</div>
   <div class="kpis">${kpi('Projets', s.ps.length, `${s.active} en cours · ${s.done} terminé${s.done > 1 ? 's' : ''}`)}${kpi('Montant des projets', fmt(s.value), 'hors taxes')}${kpi('Payé', fmt(s.paid), `sur ${fmt(s.billed)} facturés`, 'ok')}${kpi('Impayés', fmt(s.due), s.late ? `dont ${fmt(s.late)} en retard` : 'aucun retard', s.late ? 'bad' : (s.due ? 'warn' : ''))}</div>
   <div class="grid2"><section class="card"><h2>Projets</h2>${s.ps.length ? `<div class="plist">${s.ps.map(p => projRow(p, false)).join('')}</div>` : '<p class="empty">Aucun projet.</p>'}</section>
@@ -705,6 +713,8 @@ function pSettings() {
   const ta = (k, l) => `<label class="field full"><span>${l}</span><textarea id="s-${k}" rows="3" oninput="App.setS('${k}',this.value)">${esc(st[k])}</textarea></label>`;
   return `<div class="ph"><div><h1>Mon profil</h1><div class="meta">Vos factures reprennent automatiquement votre logo, vos couleurs, votre signature et votre cachet.</div></div></div>
   <div class="set-layout"><div class="stack">
+  <section class="card"><h2>Photo de profil</h2><div class="logo-pick" style="margin:0">${meAvatar(72)}<div><b>${esc(S.settings.owner || 'Ton nom')}</b><div class="muted small">${S.settings.avatar ? 'Visible en haut de l’écran et par tes clients dans leur espace.' : myPhoto() ? 'Photo de ton compte Google. Importe une autre photo si tu préfères.' : 'Ajoute une photo pour que tes clients te reconnaissent dans leur espace.'}</div>
+    <div class="row" style="margin-top:8px"><label class="btn sm ${S.settings.avatar ? '' : 'primary'}">${S.settings.avatar ? 'Changer la photo' : 'Importer une photo'}<input type="file" hidden accept="image/*" onchange="App.uploadAvatar(this)"></label>${S.settings.avatar ? `<button class="btn sm ghost" onclick="App.setS('avatar','',true)">Retirer</button>` : ''}</div></div></div></section>
   ${user ? "" : accountCard()}
   <section class="card"><h2>Votre entreprise</h2><div class="form">${f('name', 'Nom commercial')}${f('owner', 'Votre nom')}${f('email', 'Email', 'email')}${f('phone', 'Téléphone / WhatsApp', 'tel')}${ta('address', 'Adresse')}${f('siret', 'N° SIRET / RCCM / NIF', 'text', true)}${ta('iban', 'Coordonnées de paiement (IBAN, Mobile Money…)')}${ta('legal', 'Mentions légales en pied de facture')}</div></section>
   <section class="card"><h2>Facturation</h2><div class="form">${f('currency', 'Devise (€, FCFA, $, MAD…)')}${f('tva', 'TVA par défaut (%)', 'number')}${f('payDays', 'Délai de paiement (jours)', 'number')}${f('prefix', 'Préfixe des numéros')}${f('next', 'Prochain numéro', 'number')}${f('penalty', 'Pénalités de retard (texte)')}</div></section>
@@ -1129,6 +1139,7 @@ function setS(k, v, rerender) {
   if (rerender) return render();
   const pv = $('#tpl-preview'); if (pv) pv.innerHTML = invoiceDoc(sampleInvoice(), S.settings.template);
 }
+async function uploadAvatar(input) { const f = input.files[0]; if (!f) return; try { S.settings.avatar = await readImage(f, 256, 'image/jpeg'); save(); render(); toast('Photo de profil enregistrée'); } catch (e) { toast('Image illisible : essaie un PNG ou un JPG.'); } }
 async function uploadLogo(input) { const f = input.files[0]; if (!f) return; try { S.settings.logo = await readImage(f, 500); save(); render(); } catch (e) { toast('Image illisible : essayez un PNG ou un JPG.'); } }
 async function uploadSig(input) { const f = input.files[0]; if (!f) return; try { S.settings.signature = await readImage(f, 600); save(); render(); } catch (e) { toast('Image illisible : essayez un PNG ou un JPG.'); } }
 function saveSig() { const cv = $('#sigpad'); if (!sigDirty && !S.settings.signature) return toast('Signez d\'abord dans le cadre.'); S.settings.signature = cv.toDataURL('image/png'); save(); render(); toast('Signature enregistrée'); }
@@ -1640,7 +1651,7 @@ init();
 
 return { upgradeModal, payPick, startPayment, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
-  editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
+  editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
   addLine: () => { draft.lines.push({ label: '', qty: 1, price: 0 }); $('#m-body').innerHTML = invForm(); }, delLine: i => { draft.lines.splice(i, 1); $('#m-body').innerHTML = invForm(); }, refreshForm: () => { $('#m-body').innerHTML = invForm(); } };
 })();

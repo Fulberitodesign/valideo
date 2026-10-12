@@ -290,6 +290,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .seg-sm button{padding:8px 6px;font-size:13px}
 .dep-free{display:flex;align-items:center;gap:6px}
 .dep-free input{width:80px}
+.me-chip{display:inline-flex;align-items:center;gap:8px;padding-left:4px;cursor:pointer}
+.me-chip .avatar{border-radius:50%}
 .plan-chip{cursor:pointer}
 .plan-chip .up{color:var(--accent);font-weight:600}
 .plan-chip:hover{border-color:var(--accent)}
@@ -586,6 +588,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
     <header class="topbar">
       <a class="chip guide-chip" href="guide.html" target="_blank" rel="noopener">Guide d'utilisation</a>
       <button class="chip theme-chip" data-theme-btn onclick="cycleTheme()" type="button">Thème</button>
+      <button class="chip me-chip" id="meChip" type="button" hidden onclick="App.go('settings')" title="Mon profil"></button>
       <button class="chip plan-chip" id="planChip" type="button" hidden onclick="App.go('plan')"></button>
       <button class="chip sync" id="sync" onclick="App.go('settings')" title="État de la synchronisation"></button>
       <div class="chip role" id="role-box"><label for="role">Affichage</label><select id="role" onchange="App.setRole(this.value)"></select></div>
@@ -602,8 +605,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=25"></script>
+<script src="config.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>
