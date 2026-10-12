@@ -6,6 +6,9 @@
 //   Appel de FeexPay (webhook, sans session) avec une référence         → même revérification, puis activation
 // À déployer SANS vérification JWT : la session est vérifiée dans le code.
 // Secrets requis : FEEXPAY_TOKEN (clé API « fp_… »), FEEXPAY_SHOP_ID
+// Mode test (sandbox FeexPay, aucun argent réel) : FEEXPAY_TEST_TOKEN (« test_key_… »), FEEXPAY_TEST_SHOP_ID,
+//   réservé aux administrateurs et aux e-mails listés dans FEEXPAY_TEST_USERS (séparés par des virgules).
+//   En sandbox, un numéro qui finit par 00 réussit, 01 échoue (solde insuffisant), 05 reste en attente puis réussit.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 // Prix en francs CFA fixés côté serveur : le navigateur ne choisit jamais le montant
@@ -24,7 +27,11 @@ const NETWORKS: Record<string, { code: string; nets: Record<string, string> }> =
   BURKINA_FASO: { code: '226', nets: { MOOV: 'moov_bf', ORANGE: 'orange_bf', WAVE: 'wave_bf' } },
   CONGO_BRAZZAVILLE: { code: '242', nets: { MTN: 'mtn_cg' } },
 };
-const API = 'https://api-v2.feexpay.me/api';
+const MODES = {
+  live: { api: 'https://api-v2.feexpay.me/api', token: 'FEEXPAY_TOKEN', shop: 'FEEXPAY_SHOP_ID', provider: 'feexpay' },
+  test: { api: 'https://sandbox-api.feexpay.me/api', token: 'FEEXPAY_TEST_TOKEN', shop: 'FEEXPAY_TEST_SHOP_ID', provider: 'feexpay-test' },
+};
+const modeOf = (pay: Record<string, any>) => pay.provider === MODES.test.provider ? MODES.test : MODES.live;
 const SITE = Deno.env.get('SITE_URL') || 'https://fulberitodesign.github.io/valideo/';
 
 const cors = {
@@ -38,8 +45,9 @@ const admin = () => createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SU
 // Lit le statut chez FeexPay et, s'il est réussi, active l'offre une seule fois
 async function settle(pay: Record<string, any>) {
   if (pay.status !== 'pending' || !pay.provider_id) return { status: pay.status };
-  const r = await fetch(`${API}/transactions/public/single/status/${encodeURIComponent(pay.provider_id)}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${Deno.env.get('FEEXPAY_TOKEN')}` },
+  const m = modeOf(pay);
+  const r = await fetch(`${m.api}/transactions/public/single/status/${encodeURIComponent(pay.provider_id)}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${Deno.env.get(m.token)}` },
   });
   const s = await r.json().catch(() => ({}));
   const st = String(s?.status || '').toUpperCase();
@@ -98,8 +106,15 @@ Deno.serve(async (req) => {
     const { plan, period } = body;
     const amount = PRICES[plan]?.[period];
     if (!amount) return json({ error: 'Offre ou période inconnue' }, 400);
-    const token = Deno.env.get('FEEXPAY_TOKEN'), shop = Deno.env.get('FEEXPAY_SHOP_ID');
-    if (!token || !shop) return json({ error: 'Le paiement en ligne n\'est pas encore configuré' }, 503);
+    let mode = MODES.live;
+    if (body.test) {
+      const testers = String(Deno.env.get('FEEXPAY_TEST_USERS') || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
+      const { data: prof } = await admin().from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+      if (!prof?.is_admin && !testers.includes(String(user.email).toLowerCase())) return json({ error: 'Le mode test est réservé à l’administrateur' }, 403);
+      mode = MODES.test;
+    }
+    const API = mode.api, token = Deno.env.get(mode.token), shop = Deno.env.get(mode.shop);
+    if (!token || !shop) return json({ error: mode === MODES.test ? 'Mode test non configuré (clés sandbox manquantes)' : 'Le paiement en ligne n\'est pas encore configuré' }, 503);
 
     const card = body.method === 'card';
     const country = NETWORKS[body.country] ? body.country : 'BENIN';
@@ -112,7 +127,7 @@ Deno.serve(async (req) => {
 
     const db = admin();
     const { data: pay, error: e1 } = await db.from('payments')
-      .insert({ user_id: user.id, provider: 'feexpay', plan, period, method: card ? 'card' : 'mobile', amount, currency: 'XOF', status: 'pending' })
+      .insert({ user_id: user.id, provider: mode.provider, plan, period, method: card ? 'card' : 'mobile', amount, currency: 'XOF', status: 'pending' })
       .select().single();
     if (e1) throw e1;
 
@@ -139,11 +154,11 @@ Deno.serve(async (req) => {
       return json({ error: `${why || 'FeexPay a refusé la demande de paiement'} (code ${r.status}${why ? '' : ' · ' + raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160)})` }, 502);
     }
     await db.from('payments').update({ provider_id: String(reference) }).eq('id', pay.id);
-    const out: Record<string, unknown> = { payment_id: pay.id, reference };
+    const out: Record<string, unknown> = { payment_id: pay.id, reference, test: mode === MODES.test };
     const link = j?.paymentUrl || j?.payment_url || j?.url || j?.data?.url || j?.redirect_url;
     if (link) out.url = link;
     // Certains réseaux répondent tout de suite
-    if (String(j?.status || '').toUpperCase() === 'SUCCESSFUL') Object.assign(out, await settle({ ...pay, provider_id: String(reference) }));
+    if (String(j?.status || '').toUpperCase() === 'SUCCESSFUL') Object.assign(out, await settle({ ...pay, provider: mode.provider, provider_id: String(reference) }));
     return json(out);
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
