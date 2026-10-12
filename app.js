@@ -213,9 +213,17 @@ function clientStats(cid) {
 function nextNumber() { const st = S.settings; const n = `${st.prefix}-${new Date().getFullYear()}-${String(st.next).padStart(3, '0')}`; st.next++; return n; }
 
 /* ---------------- Automatisation : fin de projet → facture ---------------- */
+/* Une facture peut couvrir un ou plusieurs projets : chaque ligne peut porter son projet */
+const invProjects = i => [...new Set([...(i.projectIds || []), ...(i.projectId ? [i.projectId] : []), ...(i.lines || []).map(l => l.projectId).filter(Boolean)])];
+const invHas = (i, pid) => invProjects(i).includes(pid);
+function billedFor(i, pid) {
+  if ((i.lines || []).some(l => l.projectId)) return i.lines.filter(l => l.projectId === pid).reduce((a, l) => a + (+l.qty || 0) * (+l.price || 0), 0);
+  return i.projectId === pid ? totals(i).ht : 0;
+}
+const projectBilled = (pid, exceptId) => round(S.invoices.filter(i => i.id !== exceptId && invHas(i, pid)).reduce((a, i) => a + billedFor(i, pid), 0));
 function createInvoiceFromProject(p, status) {
-  const lines = [{ label: `${p.title} — montage vidéo`, qty: 1, price: +p.amount || 0 }];
-  S.invoices.filter(i => i.projectId === p.id && i.kind === 'acompte').forEach(i => lines.push({ label: `Acompte déjà facturé (${i.number})`, qty: 1, price: -totals(i).ht }));
+  const lines = [{ label: p.title, qty: 1, price: +p.amount || 0, projectId: p.id }];
+  S.invoices.filter(i => invHas(i, p.id)).forEach(i => { const b = round(billedFor(i, p.id)); if (b) lines.push({ label: `${i.kind === 'acompte' ? 'Acompte' : 'Montant'} déjà facturé (${i.number})`, qty: 1, price: -b, projectId: p.id }); });
   const i = { id: uid(), number: nextNumber(), clientId: p.clientId, projectId: p.id, kind: 'final', date: today(), due: addDays(today(), +S.settings.payDays || 30), lines, discount: { type: 'pct', value: 0 }, tva: +S.settings.tva || 0, notes: '', status, payments: [], reminders: [], auto: status === 'a_verifier' };
   S.invoices.push(i);
   log(p.id, status === 'a_verifier' ? `Facture ${i.number} générée automatiquement, en attente de votre vérification` : `Facture ${i.number} créée`);
@@ -227,7 +235,7 @@ function checkCompletion(p) {
     p.status = 'termine'; p.doneAt = today();
     if (MODE === 'portal') return;
     log(p.id, 'Projet terminé : toutes les étapes sont validées des deux côtés');
-    if (!S.invoices.some(i => i.projectId === p.id && i.kind === 'final')) {
+    if (!S.invoices.some(i => i.projectId === p.id && i.kind === 'final') && projectBilled(p.id) < (+p.amount || 0) - .005) {
       const i = createInvoiceFromProject(p, 'a_verifier');
       setTimeout(() => toast(`Projet terminé. Facture ${i.number} générée (${fmt(totals(i).ttc)}), à vérifier avant envoi.`, isOwner() ? 'Vérifier' : null, () => go('invoice', i.id)), 50);
     }
@@ -354,7 +362,7 @@ function pClient(id) {
   const invs = S.invoices.filter(i => i.clientId === id && (own || isSent(i))).sort((a, b) => b.date.localeCompare(a.date));
   return `${own ? `<div class="crumbs"><a onclick="App.go('clients')">Clients</a> /</div>` : ''}
   <div class="ph"><div class="row" style="gap:14px"><span class="avatar" style="width:52px;height:52px;font-size:18px">${initials(cname(c))}</span><div><h1>${own ? esc(cname(c)) : 'Bonjour ' + esc((c.name || '').split(' ')[0])}</h1><div class="meta">${own ? `${c.company ? esc(c.name) + ' · ' : ''}<span class="mono small">${esc(c.email || '')}</span> <span class="mono small">${esc(c.phone || '')}</span>` : `Vos projets avec ${esc(S.settings.name)}`}</div></div></div>
-  ${own ? `<div class="row"><button class="btn" onclick="App.editClient('${c.id}')">Modifier</button><button class="btn" onclick="App.editInvoice(null,{clientId:'${c.id}'})">Nouvelle facture</button><button class="btn primary" onclick="App.editProject(null,'${c.id}')">Nouveau projet</button></div>` : ''}</div>
+  ${own ? `<div class="row"><button class="btn" onclick="App.editClient('${c.id}')">Modifier</button><button class="btn" onclick="App.editInvoice(null,{clientId:'${c.id}'})">Nouvelle facture</button><button class="btn" onclick="App.groupInvoice('${c.id}')">Facture groupée</button><button class="btn primary" onclick="App.editProject(null,'${c.id}')">Nouveau projet</button></div>` : ''}</div>
   <div class="kpis">${kpi('Projets', s.ps.length, `${s.active} en cours · ${s.done} terminé${s.done > 1 ? 's' : ''}`)}${kpi('Montant des projets', fmt(s.value), 'hors taxes')}${kpi('Payé', fmt(s.paid), `sur ${fmt(s.billed)} facturés`, 'ok')}${kpi('Impayés', fmt(s.due), s.late ? `dont ${fmt(s.late)} en retard` : 'aucun retard', s.late ? 'bad' : (s.due ? 'warn' : ''))}</div>
   <div class="grid2"><section class="card"><h2>Projets</h2>${s.ps.length ? `<div class="plist">${s.ps.map(p => projRow(p, false)).join('')}</div>` : '<p class="empty">Aucun projet.</p>'}</section>
   <section class="card"><h2>Factures</h2>${invs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Échéance</th><th class="num">Montant</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>${invs.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture.</p>'}</section></div>
@@ -378,7 +386,7 @@ function pProject(id) {
   const p = proj(id); if (!p) return nf();
   const c = client(p.clientId), own = isOwner(), pr = progress(p);
   const meds = S.media.filter(m => m.projectId === p.id);
-  const invs = S.invoices.filter(i => i.projectId === p.id && (own || isSent(i)));
+  const invs = S.invoices.filter(i => invHas(i, p.id) && (own || isSent(i)));
   const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final');
   return `<div class="crumbs">${own ? `<a onclick="App.go('projects')">Projets</a> / <a onclick="App.go('client','${c.id}')">${esc(cname(c))}</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
   <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>${canMoney() ? `·<span class="mono">${fmt(p.amount)} HT</span>` : ''}${deadlinePill(p)}</div></div>
@@ -396,7 +404,7 @@ function pProject(id) {
         <div class="people">${(own ? ensurePeople(p) : (p.people || [])).map(x => `<div class="person"><div style="min-width:0"><b>${esc(x.name)}</b> ${rolePill(x)} <span class="muted small">${esc(x.title || '')}</span><div class="mono small muted">${esc(x.email || '')} ${esc(x.phone || '')}</div></div>${own ? `<div class="row" style="gap:2px"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}','${x.id}')">Inviter</button>${x.main ? '' : `<button class="icon-btn" aria-label="Retirer ${esc(x.name)}" onclick="App.delCollab('${p.id}','${x.id}')">×</button>`}</div>` : ''}</div>`).join('')}</div>
         ${own ? '<p class="hint">Chaque personne reçoit son propre lien, sans inscription. <b>Client</b> : valide les étapes et les versions. <b>Équipe</b> : commente et marque les corrections, sans voir les montants.</p>' : ''}</section>
       ${canMoney() ? '' : '<!--'}      <section class="card"><div class="card-h"><h2>Facturation</h2>${own ? `<div class="row">${hasFinal ? '' : `<button class="btn sm ghost" onclick="App.depositInvoice('${p.id}')">Acompte</button><button class="btn sm" onclick="App.finalInvoice('${p.id}')">Facturer maintenant</button>`}</div>` : ''}</div>
-        ${invs.length ? `<div class="mlist">${invs.map(i => `<button class="mrow" onclick="App.go('invoice','${i.id}')"><span class="mono">${i.number}</span><span class="mname muted">${i.kind === 'acompte' ? 'Acompte' : i.kind === 'final' ? 'Facture finale' : 'Facture'}</span><span class="mono small">${fmt(totals(i).ttc)}</span>${invPill(i)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'La facture finale sera générée automatiquement quand toutes les étapes seront validées.' : 'Aucune facture pour ce projet.'}</p>`}</section>
+        ${invs.length ? `<div class="mlist">${invs.map(i => `<button class="mrow" onclick="App.go('invoice','${i.id}')"><span class="mono">${i.number}</span><span class="mname muted">${i.kind === 'acompte' ? 'Acompte' : i.kind === 'groupee' ? `Facture groupée · ${invProjects(i).length} projets` : i.kind === 'final' ? 'Facture finale' : 'Facture'}</span><span class="mono small">${fmt(totals(i).ttc)}</span>${invPill(i)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'La facture finale sera générée automatiquement quand toutes les étapes seront validées.' : 'Aucune facture pour ce projet.'}</p>`}</section>
       ${canMoney() ? '' : '-->'}<section class="card"><h2>Historique</h2>${actList(S.activity.filter(a => a.pid === p.id).slice(0, 10), false)}</section>
     </div>
   </div>`;
@@ -456,10 +464,10 @@ function pInvoices() {
   const list = S.invoices.filter(i => { const st = invStatus(i); return invFilter === 'all' || st === invFilter || (invFilter === 'envoyee' && st === 'partielle'); }).sort((a, b) => b.number.localeCompare(a.number));
   const count = k => S.invoices.filter(i => invStatus(i) === k).length;
   const tab = (k, l) => `<button class="${invFilter === k ? 'on' : ''}" onclick="App.setFilter('inv','${k}')">${l}${k !== 'all' && count(k) ? ` · ${count(k)}` : ''}</button>`;
-  return `<div class="ph"><h1>Factures</h1><div class="row">${viewToggle('invoices')}<button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
+  return `<div class="ph"><h1>Factures</h1><div class="row">${viewToggle('invoices')}<button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn" onclick="App.groupInvoice()">Facture groupée</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
   <div class="tabs">${tab('all', 'Toutes')}${tab('a_verifier', 'À vérifier')}${tab('brouillon', 'Brouillons')}${tab('envoyee', 'Envoyées')}${tab('retard', 'En retard')}${tab('payee', 'Payées')}</div>
-  ${list.length && layout.invoices === 'grid' ? `<div class="cgrid">${list.map(i => { const t = totals(i); return `<button class="ccard" onclick="App.go('invoice','${i.id}')"><div class="card-h"><span class="mono small">${i.number}</span>${invPill(i)}</div><div class="cn">${esc(cname(client(i.clientId)))}</div><div class="muted small">${esc(proj(i.projectId)?.title || 'Sans projet')}</div><div class="k-v mono" style="font-size:22px;font-weight:600">${fmt(t.ttc)}</div><div class="cl"><span class="muted">Échéance</span><b>${fdate(i.due)}</b></div><div class="cl"><span class="muted">Reste à payer</span><b class="mono" style="color:${t.due && isSent(i) ? 'var(--bad)' : 'inherit'}">${fmt(t.due)}</b></div></button>`; }).join('')}</div>` : `<section class="card">${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Projet</th><th>Émise</th><th>Échéance</th><th class="num">Total</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
-  ${list.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${esc(cname(client(i.clientId)))}</td><td class="muted">${esc(proj(i.projectId)?.title || '—')}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture dans cette vue.</p>'}</section>`}`;
+  ${list.length && layout.invoices === 'grid' ? `<div class="cgrid">${list.map(i => { const t = totals(i); return `<button class="ccard" onclick="App.go('invoice','${i.id}')"><div class="card-h"><span class="mono small">${i.number}</span>${invPill(i)}</div><div class="cn">${esc(cname(client(i.clientId)))}</div><div class="muted small">${esc(invLabel(i) === '—' ? 'Sans projet' : invLabel(i))}</div><div class="k-v mono" style="font-size:22px;font-weight:600">${fmt(t.ttc)}</div><div class="cl"><span class="muted">Échéance</span><b>${fdate(i.due)}</b></div><div class="cl"><span class="muted">Reste à payer</span><b class="mono" style="color:${t.due && isSent(i) ? 'var(--bad)' : 'inherit'}">${fmt(t.due)}</b></div></button>`; }).join('')}</div>` : `<section class="card">${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Projet</th><th>Émise</th><th>Échéance</th><th class="num">Total</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
+  ${list.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${esc(cname(client(i.clientId)))}</td><td class="muted">${esc(invLabel(i))}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture dans cette vue.</p>'}</section>`}`;
 }
 function stampSVG(st, color) {
   const k = uid();
@@ -477,7 +485,7 @@ function invoiceDoc(i, tplOverride) {
   <div class="p-head"><div class="p-brand">${st.logo ? `<img class="p-logo" src="${st.logo}" alt="">` : ''}<div><div class="p-name">${esc(st.name)}</div><div class="p-small">${esc(st.address).replace(/\n/g, '<br>')}<br>${esc(st.email)}${st.phone ? ' · ' + esc(st.phone) : ''}${st.siret ? '<br>N° ' + esc(st.siret) : ''}</div></div></div>
   <div class="p-title"><div class="p-doc">${i.kind === 'acompte' ? 'ACOMPTE' : 'FACTURE'}</div><div class="p-num">N° ${esc(i.number)}</div><div class="p-small">Émise le ${fdate(i.date)}<br>Échéance le ${fdate(i.due)}</div></div></div>
   <div class="p-parties"><div><div class="p-label">Facturé à</div><b>${esc(c.company || c.name)}</b><div class="p-small">${c.company ? esc(c.name) + '<br>' : ''}${esc(c.address || '')}${c.address ? '<br>' : ''}${esc(c.email || '')}</div></div>
-  <div><div class="p-label">Projet</div><b>${esc(p?.title || '—')}</b>${p?.deadline ? `<div class="p-small">Livraison ${fdate(p.deadline)}</div>` : ''}</div></div>
+  ${invProjects(i).length > 1 ? `<div><div class="p-label">Projets</div><b>${invProjects(i).length} projets</b><div class="p-small">${invProjects(i).map(id => esc(proj(id)?.title || '')).filter(Boolean).join('<br>')}</div></div>` : `<div><div class="p-label">Projet</div><b>${esc(p?.title || '—')}</b>${p?.deadline ? `<div class="p-small">Livraison ${fdate(p.deadline)}</div>` : ''}</div>`}</div>
   <table class="p-lines"><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Total HT</th></tr></thead><tbody>
   ${i.lines.map(l => `<tr><td>${esc(l.label)}</td><td class="n">${+l.qty || 0}</td><td class="n">${fmt(l.price)}</td><td class="n">${fmt((+l.qty || 0) * (+l.price || 0))}</td></tr>`).join('')}</tbody></table>
   <div class="p-totals"><div><span>Sous-total HT</span><span>${fmt(t.sub)}</span></div>
@@ -811,7 +819,7 @@ function invForm() {
   <label class="field"><span>Projet</span><select id="d-project" onchange="App.d('projectId',this.value)"><option value="">Aucun</option>${ps.map(p => `<option value="${p.id}" ${p.id === d.projectId ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></label>
   <label class="field"><span>Date d'émission</span><input id="d-date" type="date" value="${d.date}" oninput="App.d('date',this.value)"></label>
   <label class="field"><span>Échéance</span><input id="d-due" type="date" value="${d.due}" oninput="App.d('due',this.value)"></label>
-  <label class="field"><span>Type</span><select id="d-kind" onchange="App.d('kind',this.value)">${[['standard', 'Facture'], ['acompte', 'Acompte'], ['final', 'Facture finale de projet']].map(([k, l]) => `<option value="${k}" ${d.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+  <label class="field"><span>Type</span><select id="d-kind" onchange="App.d('kind',this.value)">${[['standard', 'Facture'], ['acompte', 'Acompte'], ['final', 'Facture finale de projet'], ['groupee', 'Facture groupée (plusieurs projets)']].map(([k, l]) => `<option value="${k}" ${d.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
   <label class="field"><span>TVA (%)</span><input id="d-tva" type="number" min="0" step="any" value="${d.tva}" oninput="App.d('tva',this.value)"></label></div>
   <div class="field"><span>Lignes</span><div class="tbl-wrap"><table class="lines-ed"><tbody>${d.lines.map((l, k) => `<tr><td><input id="dl-l${k}" value="${esc(l.label)}" placeholder="Désignation" oninput="App.dl(${k},'label',this.value)"></td><td><input id="dl-q${k}" type="number" step="any" value="${l.qty}" aria-label="Quantité" oninput="App.dl(${k},'qty',this.value)" style="width:70px"></td><td><input id="dl-p${k}" type="number" step="any" value="${l.price}" aria-label="Prix unitaire" oninput="App.dl(${k},'price',this.value)" style="width:110px"></td><td><button class="icon-btn" aria-label="Retirer la ligne" onclick="App.delLine(${k})">×</button></td></tr>`).join('')}</tbody></table></div><button class="btn sm ghost" style="align-self:flex-start" onclick="App.addLine()">Ajouter une ligne</button></div>
   <div class="form"><label class="field"><span>Remise</span><input id="d-dv" type="number" min="0" step="any" value="${d.discount.value}" oninput="App.dd('value',this.value)"></label>
@@ -822,7 +830,7 @@ function invForm() {
 const draftTotals = t => `<div><span class="muted">Sous-total HT</span><span class="mono">${fmt(t.sub)}</span></div>${t.disc ? `<div><span class="muted">Remise</span><span class="mono">− ${fmt(t.disc)}</span></div>` : ''}<div><span class="muted">TVA</span><span class="mono">${fmt(t.tva)}</span></div><div class="grand"><span>Total TTC</span><span class="mono">${fmt(t.ttc)}</span></div>`;
 const upd = () => { const e = $('#d-tot'); if (e) e.innerHTML = draftTotals(totals(draft)); };
 function saveInvoice() {
-  const d = draft; d.lines = d.lines.filter(l => l.label || +l.price).map(l => ({ label: l.label, qty: +l.qty || 0, price: +l.price || 0 })); d.tva = +d.tva || 0; d.discount.value = +d.discount.value || 0;
+  const d = draft; d.lines = d.lines.filter(l => l.label || +l.price).map(l => ({ label: l.label, qty: +l.qty || 0, price: +l.price || 0, ...(l.projectId ? { projectId: l.projectId } : {}) })); d.tva = +d.tva || 0; d.discount.value = +d.discount.value || 0;
   if (!d.lines.length) return toast('Ajoutez au moins une ligne.');
   if (!d.id) { d.id = uid(); d.number = nextNumber(); S.invoices.push(d); log(d.projectId, `Facture ${d.number} créée`); }
   else { const k = S.invoices.findIndex(x => x.id === d.id); S.invoices[k] = d; log(d.projectId, `Facture ${d.number} modifiée`); }
@@ -864,6 +872,37 @@ async function savePayment(id) {
 function delPayment(iid, pid) { const i = invoice(iid); confirmBox('Supprimer ce paiement ?', 'La facture redeviendra due pour ce montant.', 'Supprimer', () => { i.payments = i.payments.filter(p => p.id !== pid); save(); render(); }); }
 function delInvoice(id) { const i = invoice(id); confirmBox(`Supprimer ${i.number} ?`, 'Cette action est définitive. Les paiements associés seront aussi retirés de la comptabilité.', 'Supprimer', () => { S.invoices = S.invoices.filter(x => x.id !== id); save(); go('invoices'); }); }
 function setTpl(id, v) { invoice(id).template = v || undefined; save(); render(); }
+const invLabel = i => { const ps = invProjects(i); return ps.length > 1 ? `${ps.length} projets` : (proj(ps[0])?.title || '—'); };
+function groupInvoice(cid) {
+  const withProj = S.clients.filter(c => S.projects.some(p => p.clientId === c.id));
+  if (!withProj.length) return toast('Crée d\'abord des projets pour un client.');
+  cid = cid && client(cid) ? cid : withProj[0].id;
+  const ps = S.projects.filter(p => p.clientId === cid).sort((a, b) => (a.status === 'termine' ? 0 : 1) - (b.status === 'termine' ? 0 : 1) || (a.deadline || '').localeCompare(b.deadline || ''));
+  const row = p => { const done = projectBilled(p.id), rest = round((+p.amount || 0) - done), pr = progress(p);
+    return `<label class="grow ${rest <= 0 ? 'off' : ''}"><input type="checkbox" class="gi" value="${p.id}" ${rest > 0 ? 'checked' : ''} onchange="App.groupTotal()">
+      <span class="g-main"><b>${esc(p.title)}</b><span class="muted small">${p.status === 'termine' ? 'Terminé' : `En cours · ${pr} %`}${done ? ` · déjà facturé ${fmt(done)}` : ''}</span></span>
+      <span class="mono g-amt" data-rest="${Math.max(0, rest)}">${rest > 0 ? fmt(rest) : 'Facturé'}</span></label>`; };
+  openModal('Facture groupée', `<p class="hint">Coche les projets à regrouper : chacun devient une ligne de la facture, au montant restant à facturer (acomptes et factures précédentes déduits). Tu pourras ensuite modifier les lignes ou appliquer une remise.</p>
+    <label class="field"><span>Client</span><select id="g-client" onchange="App.groupInvoice(this.value)">${withProj.map(c => `<option value="${c.id}" ${c.id === cid ? 'selected' : ''}>${esc(cname(c))}</option>`).join('')}</select></label>
+    <div class="glist">${ps.map(row).join('')}</div>
+    <label class="check"><input type="checkbox" id="g-state" checked> <span>Indiquer l'état de chaque projet sur la ligne (« terminé » ou « en cours »)</span></label>
+    <div class="sum"><div class="grand"><span>Total HT</span><span class="mono" id="g-total"></span></div></div>`,
+    `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveGroupInvoice()">Créer la facture</button>`);
+  groupTotal();
+}
+function groupTotal() {
+  const t = [...document.querySelectorAll('.gi:checked')].reduce((a, x) => a + +x.closest('.grow').querySelector('.g-amt').dataset.rest, 0);
+  const e = $('#g-total'); if (e) e.textContent = fmt(t);
+}
+function saveGroupInvoice() {
+  const cid = val('g-client'), ids = [...document.querySelectorAll('.gi:checked')].map(x => x.value), withState = $('#g-state')?.checked;
+  if (!ids.length) return toast('Coche au moins un projet.');
+  const lines = ids.map(pid => { const p = proj(pid), rest = round((+p.amount || 0) - projectBilled(pid));
+    return { label: p.title + (withState ? (p.status === 'termine' ? ' — projet terminé' : ` — en cours (${progress(p)} %)`) : ''), qty: 1, price: Math.max(0, rest), projectId: pid }; });
+  const i = { id: uid(), number: nextNumber(), clientId: cid, projectId: ids.length === 1 ? ids[0] : null, projectIds: ids, kind: 'groupee', date: today(), due: addDays(today(), +S.settings.payDays || 30), lines, discount: { type: 'pct', value: 0 }, tva: +S.settings.tva || 0, notes: '', status: 'brouillon', payments: [], reminders: [] };
+  S.invoices.push(i); ids.forEach(pid => log(pid, `Inclus dans la facture groupée ${i.number}`));
+  save(); closeModal(); go('invoice', i.id); toast(`Facture ${i.number} créée : ${ids.length} projet${ids.length > 1 ? 's' : ''}, à vérifier avant envoi.`);
+}
 function finalInvoice(pid) { const i = createInvoiceFromProject(proj(pid), 'brouillon'); save(); go('invoice', i.id); }
 function depositInvoice(pid) { const p = proj(pid); editInvoice(null, { clientId: p.clientId, projectId: pid, kind: 'acompte', lines: [{ label: `Acompte 30 % — ${p.title}`, qty: 1, price: round((+p.amount || 0) * .3) }] }); }
 
@@ -1047,7 +1086,7 @@ function clientFiles(cid) {
 function projectFiles(p, withProofs) {
   const ids = [];
   S.media.filter(m => m.projectId === p.id && !m.purged).forEach(m => m.versions.forEach(v => ids.push(v.fileId)));
-  if (withProofs) S.invoices.filter(i => i.projectId === p.id && isSent(i)).forEach(i => (i.payments || []).forEach(x => x.proofId && ids.push(x.proofId)));
+  if (withProofs) S.invoices.filter(i => invHas(i, p.id) && isSent(i)).forEach(i => (i.payments || []).forEach(x => x.proofId && ids.push(x.proofId)));
   return ids;
 }
 const stripTokens = p => ({ ...p, people: (p.people || []).map(({ token, ...x }) => x) });
@@ -1057,7 +1096,7 @@ function personSnapshot(p, x, urls) {
   if (team) delete pp.amount;
   const settings = { ...S.settings }; delete settings.sample; delete settings.next; if (team) delete settings.iban;
   return { settings, who: { id: x.id, name: x.name, role: x.role }, clients: [c], projects: [pp], media: S.media.filter(m => m.projectId === p.id),
-    invoices: team ? [] : S.invoices.filter(i => i.projectId === p.id && isSent(i)), expenses: [],
+    invoices: team ? [] : S.invoices.filter(i => invHas(i, p.id) && isSent(i)), expenses: [],
     activity: S.activity.filter(a => a.pid === p.id && !/Facture|Relance|Paiement|Remise|Alerte|invité|retiré/.test(a.text)).slice(0, 40), urls };
 }
 function portalSnapshot(cid, urls) {
@@ -1388,7 +1427,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },

@@ -253,6 +253,12 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .ministeps i.done+i::before{background:var(--ok)}
 .ministeps i.half{background:transparent;box-shadow:inset 0 0 0 2px var(--ok)}
 .person.invite{align-items:flex-start}
+.glist{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto}
+.grow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 13px;border-radius:12px;background:var(--surface-2);cursor:pointer}
+.grow input{accent-color:var(--accent);width:18px;height:18px}
+.grow.off{opacity:.55}
+.g-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.g-amt{white-space:nowrap}
 .linkrow{cursor:default;align-items:flex-start}
 .card.away{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:linear-gradient(160deg,var(--accent-soft),var(--glass) 55%)}
 .linkrow a{color:var(--fg);font-weight:500;text-decoration:none;word-break:break-word}
