@@ -6,6 +6,7 @@
 <title>Validéo</title>
 <meta name="description" content="Suivi de projets vidéo, validation client, révisions et facturation pour monteurs.">
 <meta name="theme-color" content="#0b1020">
+<script src="theme.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -21,7 +22,7 @@
   --accent:#0e7490; --accent-2:#4f46e5; --accent-fg:#ffffff; --accent-soft:rgba(14,116,144,.13);
   --ok:#15803d; --ok-soft:rgba(21,128,61,.12); --warn:#b45309; --warn-soft:rgba(217,119,6,.14); --bad:#c81e1e; --bad-soft:rgba(220,38,38,.11); --info:#4338ca; --info-soft:rgba(79,70,229,.12);
   --shadow:0 1px 1px rgba(15,23,42,.04),0 10px 30px -8px rgba(15,23,42,.14);
-  --scrim:rgba(15,23,42,.38);
+  --scrim:rgba(15,23,42,.38); --menu-bg:#ffffff;
   --f-display:"Sora","Segoe UI",system-ui,sans-serif;
   --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
@@ -36,7 +37,7 @@
     --accent:#22d3ee; --accent-2:#818cf8; --accent-fg:#04161b; --accent-soft:rgba(34,211,238,.13);
     --ok:#4ade80; --ok-soft:rgba(74,222,128,.12); --warn:#fbbf24; --warn-soft:rgba(251,191,36,.12); --bad:#f87171; --bad-soft:rgba(248,113,113,.13); --info:#a5b4fc; --info-soft:rgba(129,140,248,.14);
     --shadow:0 1px 1px rgba(0,0,0,.3),0 14px 40px -10px rgba(0,0,0,.6);
-    --scrim:rgba(2,4,10,.6);
+    --scrim:rgba(2,4,10,.6); --menu-bg:#141a27;
     color-scheme:dark;
   }
 }
@@ -47,7 +48,7 @@
   --accent:#22d3ee; --accent-2:#818cf8; --accent-fg:#04161b; --accent-soft:rgba(34,211,238,.13);
   --ok:#4ade80; --ok-soft:rgba(74,222,128,.12); --warn:#fbbf24; --warn-soft:rgba(251,191,36,.12); --bad:#f87171; --bad-soft:rgba(248,113,113,.13); --info:#a5b4fc; --info-soft:rgba(129,140,248,.14);
   --shadow:0 1px 1px rgba(0,0,0,.3),0 14px 40px -10px rgba(0,0,0,.6);
-  --scrim:rgba(2,4,10,.6);
+  --scrim:rgba(2,4,10,.6); --menu-bg:#141a27;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -144,6 +145,8 @@ main{padding-block:18px 80px;padding-inline:clamp(16px,3.2vw,44px);min-width:0;w
 input[type=text],input[type=email],input[type=tel],input[type=number],input[type=date],input[type=password],input:not([type]),select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--glass-strong);min-width:0;transition:border-color .15s,box-shadow .15s}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea{resize:vertical}
+select option,select optgroup{background-color:var(--menu-bg);color:var(--fg)}
+select optgroup{color:var(--muted);font-style:normal;font-weight:600}
 .form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .form .full{grid-column:1/-1}
 @media (max-width:560px){.form{grid-template-columns:minmax(0,1fr)}}
@@ -226,6 +229,36 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .chk input{accent-color:var(--ok);margin:0}
 .chk.on{background:var(--ok-soft);border-color:transparent;color:var(--ok);font-weight:600}
 @media (max-width:560px){.step{grid-template-columns:28px minmax(0,1fr) auto}.step .chk{grid-column:2/span 1}.step .s-label{grid-column:2/-1}.step.cl>:last-child{grid-column:2/-1;justify-self:start}}
+
+/* Barre d'étapes */
+.stepper-card{margin-bottom:18px;gap:6px}
+.stepper-wrap{overflow-x:auto;padding:18px 2px 4px}
+.stepper{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(var(--n),minmax(92px,1fr));min-width:calc(var(--n) * 92px)}
+.stepper li{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:0 4px}
+.stepper li+li::before{content:"";position:absolute;top:13px;left:calc(-50% + 18px);right:calc(50% + 18px);height:3px;border-radius:2px;background:var(--line)}
+.stepper li.done+li::before{background:var(--ok)}
+.stepper .dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 12px var(--f-mono);border:2px solid var(--line);background:var(--menu-bg);color:var(--muted);position:relative;z-index:1;transition:background .2s,border-color .2s}
+.stepper .dot svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.stepper li.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.stepper li.half .dot{border-color:var(--ok);border-style:dashed;color:var(--ok)}
+.stepper li.cur:not(.done) .dot{background:var(--accent);border-color:var(--accent);border-style:solid;color:var(--accent-fg);box-shadow:0 0 0 5px var(--accent-soft)}
+.stepper li.cur::after{content:"";position:absolute;top:-15px;left:50%;width:7px;height:7px;margin-left:-4px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg)}
+.stepper .lbl{font-size:12px;color:var(--muted);line-height:1.3;max-width:120px}
+.stepper li.done .lbl,.stepper li.cur .lbl{color:var(--fg);font-weight:500}
+.ministeps{display:flex;align-items:center;margin-top:8px}
+.ministeps i{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none;position:relative}
+.ministeps i+i{margin-left:12px}
+.ministeps i+i::before{content:"";position:absolute;right:100%;top:3.5px;width:12px;height:2px;background:var(--line)}
+.ministeps i.done{background:var(--ok)}
+.ministeps i.done+i::before{background:var(--ok)}
+.ministeps i.half{background:transparent;box-shadow:inset 0 0 0 2px var(--ok)}
+.person.invite{align-items:flex-start}
+.pin.team{background:var(--accent-2);color:#fff}
+.scrub .mk.team{background:var(--accent-2)}
+.theme-chip{cursor:pointer}
+.theme-chip svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+.theme-chip:hover{border-color:var(--accent)}
+.auth-theme{position:absolute;top:16px;right:16px;z-index:2}
 
 /* Media */
 .mlist{display:flex;flex-direction:column;gap:6px}
@@ -419,7 +452,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .vtoggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
 
 /* ======== Accès : connexion et inscription ======== */
-.auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.auth{position:relative;min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
 .auth-side{position:relative;overflow:hidden;padding:44px clamp(24px,4vw,64px);display:flex;flex-direction:column;gap:26px;border-right:1px solid var(--line);background:linear-gradient(160deg,rgba(14,154,181,.16),rgba(79,70,229,.12) 60%,transparent)}
 .auth-logo{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font:700 20px var(--f-display);letter-spacing:-.02em}
 .auth-logo img{width:34px;height:34px;border-radius:10px;box-shadow:0 6px 18px -4px var(--accent)}
@@ -474,6 +507,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </head>
 <body>
 <div class="auth" id="auth" hidden>
+  <button class="chip theme-chip auth-theme" data-theme-btn onclick="cycleTheme()" type="button">Thème</button>
   <aside class="auth-side">
     <a class="auth-logo" href="./"><img src="icon-192.png" alt="" width="34" height="34">Validéo</a>
     <h1>Tes clients valident.<br><span class="grad">Tu factures.</span></h1>
@@ -493,6 +527,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
   <div class="content">
     <header class="topbar">
       <a class="chip guide-chip" href="guide.html" target="_blank" rel="noopener">Guide d'utilisation</a>
+      <button class="chip theme-chip" data-theme-btn onclick="cycleTheme()" type="button">Thème</button>
       <button class="chip sync" id="sync" onclick="App.go('settings')" title="État de la synchronisation"></button>
       <div class="chip role" id="role-box"><label for="role">Affichage</label><select id="role" onchange="App.setRole(this.value)"></select></div>
     </header>

@@ -51,6 +51,31 @@ const invoice = id => S.invoices.find(i => i.id === id);
 const mediaById = id => S.media.find(m => m.id === id);
 const cname = c => c ? (c.company || c.name) : '—';
 const isOwner = () => view.as === 'me';
+const isTeam = () => MODE === 'portal' && S.who?.role === 'equipe';
+const canMoney = () => !isTeam();
+const newToken = () => (crypto.randomUUID ? crypto.randomUUID() : uid() + uid() + uid() + uid());
+const inviteLink = t => `${CFG.siteUrl || location.origin + location.pathname}?portail=${t}`;
+const rolePill = x => x.role === 'equipe' ? pill('info', 'Équipe') : pill('ok', 'Client');
+const CHECK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 5"/></svg>';
+/* Personnes invitées sur un projet : le contact client principal + clients et membres d'équipe ajoutés */
+function ensurePeople(p, clients) {
+  if (!p.people) {
+    const c = (clients || S.clients).find(x => x.id === p.clientId) || {};
+    p.people = [{ id: uid(), name: c.name || c.company || 'Client', title: 'Contact principal', email: c.email || '', phone: c.phone || '', role: 'client', main: true, token: newToken() },
+      ...(p.collaborators || []).map(x => ({ id: uid(), name: x.name, title: x.role || '', email: x.email || '', phone: x.phone || '', role: 'client', token: newToken() }))];
+  }
+  p.people.forEach(x => { if (!x.id) x.id = uid(); if (!x.token) x.token = newToken(); if (!x.role) x.role = 'client'; });
+  return p.people;
+}
+/* Barre d'étapes : chaque étape passe au vert quand elle est validée des deux côtés */
+function stepper(p) {
+  if (!p.steps.length) return '';
+  const cur = p.steps.findIndex(s => !(s.me && s.client)), n = p.steps.filter(s => s.me && s.client).length;
+  return `<section class="card stepper-card"><div class="card-h"><span class="muted small">${cur < 0 ? 'Toutes les étapes sont terminées' : `Étape ${cur + 1} sur ${p.steps.length} · ${esc(p.steps[cur].label)}`}</span><b class="mono">${n}/${p.steps.length} · ${progress(p)} %</b></div>
+  <div class="stepper-wrap"><ol class="stepper" style="--n:${p.steps.length}">${p.steps.map((s, i) => { const done = s.me && s.client, half = !done && (s.me || s.client);
+    return `<li class="${done ? 'done' : ''}${i === cur ? ' cur' : ''}${half ? ' half' : ''}" title="${esc(s.label)}${done ? ' · terminée' : half ? (s.me ? ' · validée par le prestataire' : ' · validée par le client') : ''}"><span class="dot">${done ? CHECK_SVG : i + 1}</span><span class="lbl">${esc(s.label)}</span></li>`; }).join('')}</ol></div></section>`;
+}
+const miniSteps = p => `<span class="ministeps" aria-label="${p.steps.filter(s => s.me && s.client).length} étapes terminées sur ${p.steps.length}">${p.steps.map(s => `<i class="${s.me && s.client ? 'done' : (s.me || s.client) ? 'half' : ''}"></i>`).join('')}</span>`;
 const TYPE_LABEL = { video: 'VIDÉO', audio: 'AUDIO', image: 'IMAGE' };
 const DEFAULT_STEPS = ['Brief & devis validés', 'Dérushage', 'Montage V1', 'Retours client', 'Corrections / V2', 'Étalonnage & mixage', 'Livraison des fichiers'];
 const COLORS = ['#0b7285', '#1c3d5a', '#5f3dc4', '#c2255c', '#d9480f', '#2b8a3e', '#212529'];
@@ -201,7 +226,7 @@ function alerts() {
   S.media.forEach(m => {
     const pd = purgeDate(m);
     if (pd && !m.purged && diffDays(t0, pd) <= 2) out.push({ lvl: 'info', title: `Fichiers de « ${m.name} » supprimés ${pd === t0 ? "aujourd'hui" : 'le ' + fdate(pd)}`, sub: `Validé le ${fdate(m.approvedAt)} · libère de l'espace de stockage`, act: [['Voir', `App.go('media','${m.id}')`]] });
-    const n = m.comments.filter(c => c.author === 'client' && !c.resolved).length;
+    const n = m.comments.filter(c => c.author !== 'me' && !c.resolved).length;
     if (n) out.push({ lvl: 'info', title: `${n} retour${n > 1 ? 's' : ''} client à traiter`, sub: `${m.name} · ${proj(m.projectId)?.title || ''}`, act: [['Ouvrir', `App.go('media','${m.id}')`]] });
   });
   const o = { bad: 0, warn: 1, info: 2 };
@@ -216,7 +241,7 @@ function alertList(list) {
 function navHTML() {
   if (!isOwner()) {
     const c = client(view.clientId); const ps = S.projects.filter(p => p.clientId === c.id);
-    return `<button class="${route.page === 'client' ? 'on' : ''}" onclick="App.go('client','${c.id}')">Mon espace</button><div class="nav-label">Mes projets</div>` +
+    return (isTeam() ? '' : `<button class="${route.page === 'client' ? 'on' : ''}" onclick="App.go('client','${c.id}')">Mon espace</button>`) + `<div class="nav-label">${isTeam() ? 'Projet' : 'Mes projets'}</div>` +
       ps.map(p => `<button class="sub ${route.id === p.id ? 'on' : ''}" onclick="App.go('project','${p.id}')"><span>${esc(p.title)}</span></button>`).join('');
   }
   const parent = { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
@@ -228,7 +253,7 @@ function navHTML() {
 function render() {
   if (!isOwner() && !client(view.clientId)) view = { as: 'me' };
   $('#nav').innerHTML = navHTML();
-  $('#role').innerHTML = `<option value="me">Ma vue (monteur)</option><optgroup label="Voir comme un client">` + S.clients.map(c => `<option value="${c.id}">${esc(cname(c))}</option>`).join('') + '</optgroup>';
+  $('#role').innerHTML = `<option value="me">Ma vue (prestataire)</option><optgroup label="Voir comme un client">` + S.clients.map(c => `<option value="${c.id}">${esc(cname(c))}</option>`).join('') + '</optgroup>';
   $('#role-box').classList.toggle('client', !isOwner());
   $('#role').value = isOwner() ? 'me' : view.clientId;
   const r = route; let html;
@@ -236,6 +261,7 @@ function render() {
     html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin }[r.page] || pDashboard)(r.id);
   } else {
     const cid = view.clientId; let ok = false;
+    if (isTeam() && route.page !== 'media') route = { page: 'project', id: S.projects[0]?.id };
     if (r.page === 'project') ok = proj(r.id)?.clientId === cid;
     if (r.page === 'media') ok = proj(mediaById(r.id)?.projectId)?.clientId === cid;
     if (r.page === 'invoice') { const i = invoice(r.id); ok = i && i.clientId === cid && isSent(i); }
@@ -263,7 +289,7 @@ const nf = () => `<p class="empty">Élément introuvable. <a onclick="App.go('da
 const kpi = (l, v, s = '', tone = '') => `<div class="kpi ${tone}"><span class="k-l">${l}</span><span class="k-v">${v}</span><span class="k-s">${s}</span></div>`;
 function projRow(p, showClient = true) {
   const pr = progress(p);
-  return `<button class="prow" onclick="App.go('project','${p.id}')"><div><div class="t">${esc(p.title)}</div><div class="s">${showClient ? esc(cname(client(p.clientId))) + ' · ' : ''}${fmt(p.amount)} HT · livraison ${fdate(p.deadline)}</div><div class="prog"><div class="bar ${pr === 100 ? 'done' : ''}"><i style="width:${pr}%"></i></div><span class="mono small">${pr}%</span></div></div><div>${deadlinePill(p)}</div></button>`;
+  return `<button class="prow" onclick="App.go('project','${p.id}')"><div><div class="t">${esc(p.title)}</div><div class="s">${showClient ? esc(cname(client(p.clientId))) + ' · ' : ''}${canMoney() ? fmt(p.amount) + ' HT · ' : ''}livraison ${fdate(p.deadline)}</div><div class="row" style="gap:10px">${miniSteps(p)}<span class="mono small muted" style="margin-top:8px">${pr}%</span></div></div><div>${deadlinePill(p)}</div></button>`;
 }
 
 /* ----- Tableau de bord ----- */
@@ -327,22 +353,22 @@ function pProject(id) {
   const invs = S.invoices.filter(i => i.projectId === p.id && (own || isSent(i)));
   const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final');
   return `<div class="crumbs">${own ? `<a onclick="App.go('projects')">Projets</a> / <a onclick="App.go('client','${c.id}')">${esc(cname(c))}</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
-  <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>·<span class="mono">${fmt(p.amount)} HT</span>${deadlinePill(p)}</div></div>
+  <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>${canMoney() ? `·<span class="mono">${fmt(p.amount)} HT</span>` : ''}${deadlinePill(p)}</div></div>
   ${own ? `<div class="row"><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
-  <div class="bigprog"><div class="bar ${pr === 100 ? 'done' : ''}"><i style="width:${pr}%"></i></div><b class="mono">${pr} %</b></div>
+  ${stepper(p)}
   <div class="grid2 wide-left">
     <section class="card"><div class="card-h"><h2>Étapes</h2>${own ? `<button class="btn sm ghost" onclick="App.addStep('${p.id}')">Ajouter une étape</button>` : ''}</div>
-      <p class="hint">${own ? 'Une étape est terminée quand vous et votre client l\'avez validée. Vous pouvez cocher pour le client s\'il vous a confirmé par message. À la dernière validation, la facture est préparée automatiquement.' : 'Validez chaque étape quand elle vous convient. Votre monteur est prévenu à chaque validation.'}</p>
+      <p class="hint">${own ? 'Une étape est terminée quand vous et votre client l\'avez validée. Vous pouvez cocher pour le client s\'il vous a confirmé par message. À la dernière validation, la facture est préparée automatiquement.' : (isTeam() ? 'Vous suivez ce projet en tant que membre de l\'équipe : le client et le prestataire valident les étapes.' : 'Validez chaque étape quand elle vous convient. Votre prestataire est prévenu à chaque validation.')}</p>
       <div class="steps">${p.steps.map((s, i) => stepRow(p, s, i)).join('') || '<p class="empty">Aucune étape.</p>'}</div></section>
     <div class="stack">
       <section class="card"><div class="card-h"><h2>Médias en révision</h2>${own ? `<label class="btn sm">Importer un fichier<input type="file" hidden accept="video/*,audio/*,image/*" onchange="App.uploadMedia('${p.id}',this)"></label>` : ''}</div>
         ${meds.length ? `<div class="mlist">${meds.map(m => `<button class="mrow" onclick="App.go('media','${m.id}')"><span class="mtype">${TYPE_LABEL[m.type]}</span><span class="mname">${esc(m.name)}</span><span class="mono small muted">V${m.versions.at(-1).v}</span>${mediaPill(m)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'Importez une vidéo, un son ou une image : le client pourra commenter à un instant précis ou à un endroit précis.' : 'Aucun média pour l\'instant.'}</p>`}</section>
-      <section class="card"><div class="card-h"><h2>Participants</h2>${own ? `<button class="btn sm ghost" onclick="App.editCollab('${p.id}')">Ajouter</button>` : ''}</div>
-        <div class="people"><div class="person"><div><b>${esc(cname(c))}</b> <span class="muted small">Client</span><div class="mono small muted">${esc(c.email || '')} ${esc(c.phone || '')}</div></div></div>
-        ${p.collaborators.map((x, i) => `<div class="person"><div><b>${esc(x.name)}</b> <span class="muted small">${esc(x.role || 'Participant')}</span><div class="mono small muted">${esc(x.email || '')} ${esc(x.phone || '')}</div></div>${own ? `<button class="icon-btn" aria-label="Retirer" onclick="App.delCollab('${p.id}',${i})">×</button>` : ''}</div>`).join('')}</div></section>
-      <section class="card"><div class="card-h"><h2>Facturation</h2>${own ? `<div class="row">${hasFinal ? '' : `<button class="btn sm ghost" onclick="App.depositInvoice('${p.id}')">Acompte</button><button class="btn sm" onclick="App.finalInvoice('${p.id}')">Facturer maintenant</button>`}</div>` : ''}</div>
+      <section class="card"><div class="card-h"><h2>Équipe et invitations</h2>${own ? `<div class="row"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}')">Liens d'invitation</button><button class="btn sm" onclick="App.editCollab('${p.id}')">Ajouter</button></div>` : ''}</div>
+        <div class="people">${(own ? ensurePeople(p) : (p.people || [])).map(x => `<div class="person"><div style="min-width:0"><b>${esc(x.name)}</b> ${rolePill(x)} <span class="muted small">${esc(x.title || '')}</span><div class="mono small muted">${esc(x.email || '')} ${esc(x.phone || '')}</div></div>${own ? `<div class="row" style="gap:2px"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}','${x.id}')">Inviter</button>${x.main ? '' : `<button class="icon-btn" aria-label="Retirer ${esc(x.name)}" onclick="App.delCollab('${p.id}','${x.id}')">×</button>`}</div>` : ''}</div>`).join('')}</div>
+        ${own ? '<p class="hint">Chaque personne reçoit son propre lien, sans inscription. <b>Client</b> : valide les étapes et les versions. <b>Équipe</b> : commente et marque les corrections, sans voir les montants.</p>' : ''}</section>
+      ${canMoney() ? '' : '<!--'}      <section class="card"><div class="card-h"><h2>Facturation</h2>${own ? `<div class="row">${hasFinal ? '' : `<button class="btn sm ghost" onclick="App.depositInvoice('${p.id}')">Acompte</button><button class="btn sm" onclick="App.finalInvoice('${p.id}')">Facturer maintenant</button>`}</div>` : ''}</div>
         ${invs.length ? `<div class="mlist">${invs.map(i => `<button class="mrow" onclick="App.go('invoice','${i.id}')"><span class="mono">${i.number}</span><span class="mname muted">${i.kind === 'acompte' ? 'Acompte' : i.kind === 'final' ? 'Facture finale' : 'Facture'}</span><span class="mono small">${fmt(totals(i).ttc)}</span>${invPill(i)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'La facture finale sera générée automatiquement quand toutes les étapes seront validées.' : 'Aucune facture pour ce projet.'}</p>`}</section>
-      <section class="card"><h2>Historique</h2>${actList(S.activity.filter(a => a.pid === p.id).slice(0, 10), false)}</section>
+      ${canMoney() ? '' : '-->'}<section class="card"><h2>Historique</h2>${actList(S.activity.filter(a => a.pid === p.id).slice(0, 10), false)}</section>
     </div>
   </div>`;
 }
@@ -358,12 +384,12 @@ function stepRow(p, s, i) {
     const status = both ? `Terminée le ${fdate(s.meAt > s.clientAt ? s.meAt : s.clientAt)}` : s.client ? `Validée par vous le ${fdate(s.clientAt)} · finalisation en cours` : s.me ? 'Prête : à vous de valider' : 'En cours de réalisation';
     return `<div class="step cl ${both ? 'done' : ''}"><span class="s-idx mono">${String(i + 1).padStart(2, '0')}</span>
     <div class="s-label">${esc(s.label)}<span class="s-date ${s.me && !s.client ? 'ready' : ''}">${status}</span></div>
-    ${s.client ? `<div class="row">${pill('ok', 'Validée')}${both ? '' : `<button class="link sm" onclick="App.toggleStep('${p.id}','${s.id}','client')">Annuler</button>`}</div>` : `<button class="btn sm ${s.me ? 'primary' : ''}" onclick="App.toggleStep('${p.id}','${s.id}','client')">Valider l'étape</button>`}</div>`;
+    ${isTeam() ? (both ? pill('ok', 'Terminée') : s.client ? pill('ok', 'Validée par le client') : '<span></span>') : s.client ? `<div class="row">${pill('ok', 'Validée')}${both ? '' : `<button class="link sm" onclick="App.toggleStep('${p.id}','${s.id}','client')">Annuler</button>`}</div>` : `<button class="btn sm ${s.me ? 'primary' : ''}" onclick="App.toggleStep('${p.id}','${s.id}','client')">Valider l'étape</button>`}</div>`;
   }
   const chk = (side, label, enabled, at) => `<label class="chk ${s[side] ? 'on' : ''} ${enabled ? '' : 'dis'}" title="${at ? 'Validé le ' + fdate(at) : ''}"><input type="checkbox" ${s[side] ? 'checked' : ''} ${enabled ? '' : 'disabled'} onchange="App.toggleStep('${p.id}','${s.id}','${side}')"><span>${label}</span></label>`;
   return `<div class="step ${both ? 'done' : ''}"><span class="s-idx mono">${String(i + 1).padStart(2, '0')}</span>
   <div class="s-label">${esc(s.label)}${both ? `<span class="s-date">Validée le ${fdate(s.meAt > s.clientAt ? s.meAt : s.clientAt)}</span>` : ''}</div>
-  ${chk('me', own ? 'Moi' : 'Monteur', own, s.meAt)}${chk('client', 'Client', true, s.clientAt)}
+  ${chk('me', own ? 'Moi' : 'Prestataire', own, s.meAt)}${chk('client', 'Client', true, s.clientAt)}
   ${own ? `<div class="row" style="gap:0"><button class="icon-btn" title="Renommer" aria-label="Renommer" onclick="App.renameStep('${p.id}','${s.id}')">✎</button><button class="icon-btn" title="Supprimer" aria-label="Supprimer l'étape" onclick="App.delStep('${p.id}','${s.id}')">×</button></div>` : '<span></span>'}</div>`;
 }
 
@@ -378,7 +404,7 @@ function pMedia(id) {
   else if (m.type === 'audio') stage = `<div class="stage audio"><div class="aud-ico">♪ ${esc(m.name)}</div><audio id="player" controls preload="metadata" data-file="${v.fileId}"></audio></div><div class="scrub" id="scrub"></div>`;
   else stage = `<div class="stage" style="padding:0"><div class="imgbox" id="imgbox" onclick="App.pinAt(event)"><img id="player" alt="${esc(m.name)}" data-file="${v.fileId}">${cs.map((x, i) => `<button class="pin ${x.author} ${x.resolved ? 'res' : ''}" id="pin-${x.id}" style="left:${x.x}%;top:${x.y}%" onclick="event.stopPropagation();App.seek('${m.id}','${x.id}')">${i + 1}</button>`).join('')}</div></div>`;
   if (m.purged) stage = `<div class="stage"><div class="purged"><b>Fichiers supprimés le ${fdate(m.purged)}</b><span>Toutes les versions (V1 à V${m.versions.at(-1).v}) ont été effacées ${esc(S.settings.retentionDays)} jours après validation pour libérer de l'espace. Les commentaires restent consultables.</span></div></div>`;
-  const author = x => x.author === 'me' ? esc(S.settings.owner || 'Monteur') : esc(cname(c));
+  const author = x => x.by ? esc(x.by) : x.author === 'me' ? esc(S.settings.owner || 'Prestataire') : x.author === 'team' ? 'Équipe' : esc(cname(c));
   const pd = purgeDate(m), last = m.versions.at(-1).v;
   const approve = m.purged ? '' : m.approvedV
     ? `<div class="approve ok"><div><b>V${m.approvedV} validée le ${fdate(m.approvedAt)}</b><div class="hint">${pd ? `Les fichiers de toutes les versions seront supprimés le ${fdate(pd)}.` : 'Version finale approuvée.'}</div></div>${own ? `<button class="btn sm ghost" onclick="App.approveMedia('${m.id}',false)">Annuler la validation</button>` : ''}</div>`
@@ -392,7 +418,7 @@ function pMedia(id) {
     <textarea id="ctext" rows="3" placeholder="${m.type === 'image' ? 'Ex. : recadrer légèrement à gauche' : 'Ex. : couper ce plan plus tôt, la musique est trop forte ici…'}" onfocus="App.capture()"></textarea>
     <div class="row" style="justify-content:space-between"><span class="hint">${m.type === 'image' ? 'Le point orange marque l\'endroit commenté.' : 'La lecture se met en pause quand vous écrivez : le commentaire est attaché à cet instant.'}</span><button class="btn primary" onclick="App.addComment('${m.id}')">Ajouter le commentaire</button></div></div></div>
     <section class="card"><div class="card-h"><h2>Commentaires · V${vNum}</h2><span class="muted small">${cs.length}</span></div>
-    ${cs.length ? `<div class="clist">${cs.map((x, i) => `<div class="cmt ${x.resolved ? 'res' : ''}" id="c-${x.id}"><div class="c-top"><button class="c-pos" onclick="App.seek('${m.id}','${x.id}')">${m.type === 'image' ? '#' + (i + 1) : tc(x.t)}</button><b>${author(x)}</b><span class="muted small">${ftime(x.at)}</span>${x.resolved ? pill('ok', 'Corrigé') : ''}</div><p>${esc(x.text)}</p>${own ? `<div class="row"><button class="btn sm ghost" onclick="App.resolve('${m.id}','${x.id}')">${x.resolved ? 'Rouvrir' : 'Marquer corrigé'}</button><button class="link sm" onclick="App.delComment('${m.id}','${x.id}')">Supprimer</button></div>` : ''}</div>`).join('')}</div>` : '<p class="empty">Pas encore de commentaire sur cette version.</p>'}</section>
+    ${cs.length ? `<div class="clist">${cs.map((x, i) => `<div class="cmt ${x.resolved ? 'res' : ''}" id="c-${x.id}"><div class="c-top"><button class="c-pos" onclick="App.seek('${m.id}','${x.id}')">${m.type === 'image' ? '#' + (i + 1) : tc(x.t)}</button><b>${author(x)}</b><span class="muted small">${ftime(x.at)}</span>${x.resolved ? pill('ok', 'Corrigé') : ''}</div><p>${esc(x.text)}</p>${own || isTeam() ? `<div class="row"><button class="btn sm ghost" onclick="App.resolve('${m.id}','${x.id}')">${x.resolved ? 'Rouvrir' : 'Marquer corrigé'}</button>${own ? `<button class="link sm" onclick="App.delComment('${m.id}','${x.id}')">Supprimer</button>` : ''}</div>` : ''}</div>`).join('')}</div>` : '<p class="empty">Pas encore de commentaire sur cette version.</p>'}</section>
   </div>`;
 }
 
@@ -608,8 +634,10 @@ function saveProject(id) {
   const d = { title: val('f-title').trim(), clientId: val('f-client'), amount: +val('f-amount') || 0, deadline: val('f-deadline') };
   if (!d.title) return toast('Donnez un titre au projet.');
   if (id) { Object.assign(proj(id), d); log(id, 'Projet modifié'); }
-  else { if (!planAllows('projects')) return; id = uid(); S.projects.push({ id, ...d, status: 'en_cours', createdAt: today(), collaborators: [], steps: val('f-steps').split('\n').map(s => s.trim()).filter(Boolean).map(label => ({ id: uid(), label, me: false, client: false })) }); log(id, 'Projet créé'); }
+  else { if (!planAllows('projects')) return; id = uid(); S.projects.push({ id, ...d, status: 'en_cours', createdAt: today(), collaborators: [], people: null, steps: val('f-steps').split('\n').map(s => s.trim()).filter(Boolean).map(label => ({ id: uid(), label, me: false, client: false })) }); log(id, 'Projet créé'); }
+  const fresh = !proj(id).people; ensurePeople(proj(id));
   save(); closeModal(); go('project', id);
+  if (fresh) setTimeout(() => inviteModal(id, null, true), 120);
 }
 function delProject(id) {
   if (S.invoices.some(i => i.projectId === id)) return toast('Ce projet a des factures : supprimez-les d\'abord.');
@@ -621,10 +649,10 @@ function toggleStep(pid, sid, side) {
     if (side !== 'client') return;
     s.client = !s.client; s.clientAt = s.client ? today() : null; checkCompletion(p); render();
     portalSend('step', { projectId: pid, stepId: sid, value: s.client, date: today() });
-    return toast(s.client ? `« ${s.label} » validée. ${S.settings.owner || 'Votre monteur'} est prévenu.` : 'Validation annulée');
+    return toast(s.client ? `« ${s.label} » validée. ${S.settings.owner || 'Votre prestataire'} est prévenu.` : 'Validation annulée');
   }
   s[side] = !s[side]; s[side + 'At'] = s[side] ? today() : null;
-  const who = side === 'me' ? (S.settings.owner || 'Monteur') : cname(client(p.clientId));
+  const who = side === 'me' ? (S.settings.owner || 'Prestataire') : cname(client(p.clientId));
   log(pid, `${who} a ${s[side] ? 'validé' : 'annulé la validation de'} « ${s.label} »`);
   checkCompletion(p); save(); render();
   if (s[side] && p.status !== 'termine') toast(`« ${s.label} » validée par ${side === 'me' ? 'vous' : 'le client'} · ${progress(p)} %`, 'Prévenir', () => notify(pid, `Bonjour, le projet « ${p.title} » avance : l'étape « ${s.label} » vient d'être validée par ${who}. Avancement : ${progress(p)} %.`));
@@ -638,17 +666,29 @@ function saveStep(pid, sid) {
 function renameStep(pid, sid) { const s = proj(pid).steps.find(x => x.id === sid); openModal('Renommer l\'étape', `<label class="field"><span>Nom de l'étape</span><input id="f-step" value="${esc(s.label)}"></label>`, `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveStep('${pid}','${sid}')">Enregistrer</button>`); }
 function delStep(pid, sid) { const p = proj(pid); confirmBox('Supprimer cette étape ?', esc(p.steps.find(s => s.id === sid).label), 'Supprimer', () => { p.steps = p.steps.filter(s => s.id !== sid); checkCompletion(p); save(); render(); }); }
 function editCollab(pid) {
-  openModal('Ajouter un participant', `<p class="hint">Ex. : directeur artistique, chargé de com, producteur. Il recevra les alertes d'avancement par email ou WhatsApp.</p><div class="form">
-  <label class="field"><span>Nom</span><input id="f-cn"></label><label class="field"><span>Rôle</span><input id="f-cr" placeholder="Directrice artistique"></label>
+  openModal('Ajouter une personne au projet', `<p class="hint">Un contact du client (directrice artistique, chargé de com…) ou un membre de ton équipe (monteur, graphiste, développeur…). Un lien d'invitation personnel est créé automatiquement.</p><div class="form">
+  <label class="field"><span>Nom</span><input id="f-cn" autocomplete="off"></label><label class="field"><span>Rôle sur le projet</span><input id="f-cr" placeholder="Directrice artistique, étalonneur…"></label>
+  <label class="field full"><span>Accès</span><select id="f-ca"><option value="client">Client : suit le projet, valide les étapes et les versions, commente</option><option value="equipe">Équipe : voit le projet, commente et marque les corrections, sans les montants</option></select></label>
   <label class="field"><span>Email</span><input id="f-ce" type="email"></label><label class="field"><span>WhatsApp</span><input id="f-cp" type="tel" placeholder="+221 77 123 45 67"></label></div>`,
-  `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveCollab('${pid}')">Ajouter</button>`);
+  `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveCollab('${pid}')">Ajouter et inviter</button>`);
 }
 function saveCollab(pid) {
-  const d = { name: val('f-cn').trim(), role: val('f-cr').trim(), email: val('f-ce').trim(), phone: val('f-cp').trim() };
-  if (!d.name || (!d.email && !d.phone)) return toast('Indiquez un nom et au moins un email ou un numéro WhatsApp.');
-  proj(pid).collaborators.push(d); log(pid, `${d.name} ajouté aux participants`); save(); closeModal(); render();
+  const d = { id: uid(), name: val('f-cn').trim(), title: val('f-cr').trim(), role: val('f-ca'), email: val('f-ce').trim(), phone: val('f-cp').trim(), token: newToken() };
+  if (!d.name) return toast('Indiquez au moins un nom.');
+  ensurePeople(proj(pid)).push(d); log(pid, `${d.name} invité sur le projet (${d.role === 'equipe' ? 'équipe' : 'client'})`); save(); render(); inviteModal(pid, d.id);
 }
-function delCollab(pid, i) { const p = proj(pid); p.collaborators.splice(i, 1); save(); render(); }
+function delCollab(pid, personId) {
+  const p = proj(pid), x = ensurePeople(p).find(y => y.id === personId); if (!x) return;
+  confirmBox('Retirer cette personne ?', `${esc(x.name)} ne pourra plus ouvrir le projet avec son lien.`, 'Retirer', () => { p.people = p.people.filter(y => y.id !== personId); log(pid, `${x.name} retiré du projet`); save(); render(); });
+}
+function inviteModal(pid, personId, fresh) {
+  const p = proj(pid), list = ensurePeople(p).filter(x => !personId || x.id === personId);
+  const msgFor = x => `Bonjour ${x.name.split(' ')[0]},\n\n${S.settings.owner || S.settings.name || 'Je'} t'invite à suivre le projet « ${p.title} » sur Validéo${x.role === 'equipe' ? ' en tant que membre de l\'équipe' : ''}.\n${x.role === 'equipe' ? 'Tu pourras voir les étapes, commenter les médias et marquer les corrections faites.' : 'Tu pourras suivre l\'avancement, valider les étapes et commenter les fichiers à relire.'}\n\nTon accès personnel, sans inscription :\n${inviteLink(x.token)}\n\n${S.settings.owner || ''}${S.settings.name ? ' · ' + S.settings.name : ''}`;
+  openModal(fresh ? 'Projet créé : invite ton client' : 'Liens d\'invitation', `<p class="hint">${fresh ? 'Le lien d\'invitation a été créé automatiquement. ' : ''}Chaque personne a son propre lien : ses validations et commentaires portent son nom. ${user ? 'Le lien est actif quelques secondes après l\'enregistrement.' : 'Les liens fonctionnent une fois connecté à ton compte en ligne.'}</p>
+  <div class="people">${list.map(x => `<div class="person invite"><div style="min-width:0;flex:1 1 260px"><b>${esc(x.name)}</b> ${rolePill(x)} <span class="muted small">${esc(x.title || '')}</span><div class="linkbox" style="margin-top:6px"><span style="flex:1">${esc(inviteLink(x.token))}</span></div></div>
+  <div class="row"><button class="btn sm" onclick="App.copyText('${inviteLink(x.token)}')">Copier</button>${x.email ? `<a class="btn sm" href="mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent('Invitation au projet ' + p.title)}&body=${encodeURIComponent(msgFor(x))}">Email</a>` : ''}${x.phone ? `<a class="btn sm wa" target="_blank" rel="noopener" href="https://wa.me/${x.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(msgFor(x))}">WhatsApp</a>` : ''}</div></div>`).join('')}</div>`,
+  `<button class="btn" onclick="App.editCollab('${pid}')">Ajouter une personne</button><button class="btn primary" onclick="App.closeModal()">Terminé</button>`, true);
+}
 
 /* ---------------- Notifications email / WhatsApp ---------------- */
 function openSend(title, people, subject, msg, onSent) {
@@ -659,16 +699,16 @@ function openSend(title, people, subject, msg, onSent) {
   `<button class="btn" onclick="App.copyMsg()">Copier le message</button><button class="btn primary" onclick="App.closeModal()">Terminé</button>`);
 }
 function prepLink(a, i, kind) {
-  const x = notifyCtx.people[i], msg = val('nt-msg');
+  const x = notifyCtx.people[i], msg = val('nt-msg') + (x.link ? `\n\nTon accès au projet : ${x.link}` : '');
   a.href = kind === 'mail' ? `mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent(notifyCtx.subject)}&body=${encodeURIComponent(msg)}` : `https://wa.me/${x.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(msg)}`;
   notifyCtx.onSent && notifyCtx.onSent(x, kind);
 }
 function copyMsg() { const t = val('nt-msg'); navigator.clipboard?.writeText(t).then(() => toast('Message copié'), () => { $('#nt-msg').select(); toast('Sélectionné : faites Ctrl+C'); }); }
 function notify(pid, msg) {
   const p = proj(pid), c = client(p.clientId);
-  const people = [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }, ...p.collaborators];
+  const people = ensurePeople(p).filter(x => x.email || x.phone).map(x => ({ name: x.name, role: x.role === 'equipe' ? 'Équipe' : 'Client', email: x.email, phone: x.phone, link: inviteLink(x.token) }));
   const done = p.steps.filter(s => s.me && s.client).map(s => s.label), next = p.steps.find(s => !(s.me && s.client));
-  msg = msg || `Bonjour,\n\nPoint d'avancement sur « ${p.title} » : ${progress(p)} %.\nÉtapes terminées : ${done.join(', ') || 'aucune pour l\'instant'}.\n${next ? `Prochaine étape : ${next.label}.` : 'Toutes les étapes sont terminées.'}\nLivraison prévue le ${fdate(p.deadline)}.${portalLink(c.id) ? `\n\nSuivez le projet et validez les étapes ici :\n${portalLink(c.id)}` : ''}\n\n${S.settings.owner} · ${S.settings.name}`;
+  msg = msg || `Bonjour,\n\nPoint d'avancement sur « ${p.title} » : ${progress(p)} %.\nÉtapes terminées : ${done.join(', ') || 'aucune pour l\'instant'}.\n${next ? `Prochaine étape : ${next.label}.` : 'Toutes les étapes sont terminées.'}\nLivraison prévue le ${fdate(p.deadline)}.\n\n${S.settings.owner} · ${S.settings.name}`;
   openSend('Prévenir les participants', people, `${p.title} · avancement ${progress(p)} %`, msg, (x, k) => { log(pid, `Alerte envoyée à ${x.name} (${k === 'mail' ? 'email' : 'WhatsApp'})`); save(); });
 }
 
@@ -701,13 +741,13 @@ function pinAt(e) {
 }
 function addComment(mid) {
   const m = mediaById(mid), text = val('ctext').trim(); if (!text) return toast('Écrivez votre commentaire.');
-  const v = curVer[mid] || m.versions.at(-1).v, c = { id: uid(), v, author: isOwner() ? 'me' : 'client', text, at: new Date().toISOString(), resolved: false };
+  const v = curVer[mid] || m.versions.at(-1).v, c = { id: uid(), v, author: isOwner() ? 'me' : isTeam() ? 'team' : 'client', by: MODE === 'portal' ? S.who?.name : undefined, text, at: new Date().toISOString(), resolved: false };
   if (m.type === 'image') { if (!pendingPin) return toast('Cliquez d\'abord sur l\'image à l\'endroit concerné.'); Object.assign(c, pendingPin); }
   else c.t = $('#player')?.currentTime || 0;
   m.comments.push(c); pendingPin = null;
-  if (MODE === 'portal') { render(); portalSend('comment', { mediaId: mid, comment: c }); return toast('Commentaire envoyé au monteur'); }
+  if (MODE === 'portal') { render(); portalSend('comment', { mediaId: mid, comment: c }); return toast('Commentaire envoyé'); }
   log(m.projectId, `${isOwner() ? 'Vous avez' : cname(client(proj(m.projectId).clientId)) + ' a'} commenté « ${m.name} »${m.type !== 'image' ? ' à ' + tc(c.t) : ''}`);
-  save(); render(); toast(isOwner() ? 'Commentaire ajouté' : 'Commentaire envoyé au monteur');
+  save(); render(); toast(isOwner() ? 'Commentaire ajouté' : 'Commentaire envoyé');
 }
 function seek(mid, cid) {
   const m = mediaById(mid), c = m.comments.find(x => x.id === cid); document.querySelectorAll('.cmt.focus').forEach(e => e.classList.remove('focus'));
@@ -715,7 +755,8 @@ function seek(mid, cid) {
   if (m.type === 'image') { const pin = $('#pin-' + cid); if (pin) { pin.classList.remove('flash'); void pin.offsetWidth; pin.classList.add('flash'); } }
   else { const pl = $('#player'); if (pl) { pl.currentTime = c.t; pl.pause(); } }
 }
-function resolve(mid, cid) { const m = mediaById(mid), c = m.comments.find(x => x.id === cid); c.resolved = !c.resolved; if (c.resolved) log(m.projectId, `Correction faite sur « ${m.name} » : ${c.text.slice(0, 60)}`); save(); render(); }
+function resolve(mid, cid) { const m = mediaById(mid), c = m.comments.find(x => x.id === cid); c.resolved = !c.resolved;
+  if (MODE === 'portal') { render(); portalSend('resolve', { mediaId: mid, commentId: cid, value: c.resolved }); return toast(c.resolved ? 'Correction marquée faite' : 'Commentaire rouvert'); } if (c.resolved) log(m.projectId, `Correction faite sur « ${m.name} » : ${c.text.slice(0, 60)}`); save(); render(); }
 function approveMedia(mid, on) {
   const m = mediaById(mid), v = curVer[mid] || m.versions.at(-1).v;
   m.approvedV = on ? v : null; m.approvedAt = on ? today() : null;
@@ -897,8 +938,9 @@ const Cloud = {
   async pullActions() {
     const { data, error } = await sb.from('portal_actions').select('*').eq('applied', false).order('id'); if (error) throw error;
     if (!data.length) return;
-    const byToken = Object.fromEntries(Object.entries(S.portals).map(([cid, t]) => [t, cid]));
-    data.forEach(a => applyAction(a, byToken[a.token]));
+    const byToken = Object.fromEntries(Object.entries(S.portals).map(([cid, t]) => [t, { cid }]));
+    S.projects.forEach(p => ensurePeople(p).forEach(x => { byToken[x.token] = { cid: p.clientId, pid: p.id, person: x }; }));
+    data.forEach(a => { const k = byToken[a.token]; if (k) applyAction(a, k.cid, k.person, k.pid); });
     const { error: e2 } = await sb.from('portal_actions').update({ applied: true }).in('id', data.map(a => a.id)); if (e2) throw e2;
     S.cloud.dirty = true; await DB.put('kv', 'state', S); render();
     toast(`${data.length} nouvelle${data.length > 1 ? 's' : ''} action${data.length > 1 ? 's' : ''} de vos clients`, 'Voir', () => go('dashboard'));
@@ -930,7 +972,18 @@ const Cloud = {
       const { data, error } = await sb.storage.from(this.BUCKET).createSignedUrls(need.map(id => `${user.id}/${id}`), URL_TTL); if (error) throw error;
       data.forEach((d, k) => { if (d.signedUrl) this.signed[need[k]] = { url: d.signedUrl, exp: now + URL_TTL * 1000 }; });
     }
-    const rows = [];
+    const rows = [], valid = new Set(S.clients.map(c => c.id));
+    for (const p of S.projects) {
+      for (const x of ensurePeople(p)) {
+        const key = 'p:' + x.id; valid.add(key);
+        const ids = projectFiles(p, x.role !== 'equipe'), nowS = Date.now();
+        const miss = ids.filter(id => S.cloud.uploaded[id] && !(this.signed[id]?.exp > nowS + 3 * 864e5));
+        if (miss.length) { const { data, error } = await sb.storage.from(this.BUCKET).createSignedUrls(miss.map(id => `${user.id}/${id}`), URL_TTL); if (error) throw error; data.forEach((d, k) => { if (d.signedUrl) this.signed[miss[k]] = { url: d.signedUrl, exp: nowS + URL_TTL * 1000 }; }); }
+        const snap = personSnapshot(p, x, Object.fromEntries(ids.filter(id => this.signed[id]).map(id => [id, this.signed[id].url]))), js = JSON.stringify(snap);
+        if (this.lastPub[key] === js) continue;
+        rows.push({ token: x.token, owner: user.id, client_id: key, data: snap, updated_at: new Date().toISOString() }); this.lastPub[key] = js;
+      }
+    }
     for (const c of S.clients) {
       const urls = Object.fromEntries(clientFiles(c.id).filter(id => this.signed[id]).map(id => [id, this.signed[id].url]));
       const snap = portalSnapshot(c.id, urls), js = JSON.stringify(snap);
@@ -938,8 +991,14 @@ const Cloud = {
       rows.push({ token: S.portals[c.id], owner: user.id, client_id: c.id, data: snap, updated_at: new Date().toISOString() }); this.lastPub[c.id] = js;
     }
     if (rows.length) { const { error } = await sb.from('portals').upsert(rows); if (error) { rows.forEach(r => delete this.lastPub[r.client_id]); throw error; } }
-    const gone = Object.keys(S.portals).filter(cid => !client(cid));
-    if (gone.length) { const { error } = await sb.from('portals').delete().in('client_id', gone).eq('owner', user.id); if (!error) { gone.forEach(cid => delete S.portals[cid]); S.cloud.dirty = true; } }
+    // Liens retirés (client, projet ou personne supprimés) : ils cessent de fonctionner
+    const sig = [...valid].sort().join(',');
+    if (this.lastValid !== sig) {
+      const { data: rowsNow } = await sb.from('portals').select('client_id').eq('owner', user.id);
+      const gone = (rowsNow || []).map(x => x.client_id).filter(k => !valid.has(k));
+      if (gone.length) { const { error } = await sb.from('portals').delete().in('client_id', gone).eq('owner', user.id); if (error) throw error; gone.forEach(k => { delete S.portals[k]; delete this.lastPub[k]; }); S.cloud.dirty = true; }
+      this.lastValid = sig;
+    }
   }
 };
 function referencedFiles() {
@@ -952,30 +1011,51 @@ function clientFiles(cid) {
   S.invoices.filter(i => i.clientId === cid && isSent(i)).forEach(i => (i.payments || []).forEach(p => p.proofId && ids.push(p.proofId)));
   return ids;
 }
+function projectFiles(p, withProofs) {
+  const ids = [];
+  S.media.filter(m => m.projectId === p.id && !m.purged).forEach(m => m.versions.forEach(v => ids.push(v.fileId)));
+  if (withProofs) S.invoices.filter(i => i.projectId === p.id && isSent(i)).forEach(i => (i.payments || []).forEach(x => x.proofId && ids.push(x.proofId)));
+  return ids;
+}
+const stripTokens = p => ({ ...p, people: (p.people || []).map(({ token, ...x }) => x) });
+function personSnapshot(p, x, urls) {
+  const c = { ...client(p.clientId) }; delete c.notes;
+  const team = x.role === 'equipe', pp = stripTokens(p);
+  if (team) delete pp.amount;
+  const settings = { ...S.settings }; delete settings.sample; delete settings.next; if (team) delete settings.iban;
+  return { settings, who: { id: x.id, name: x.name, role: x.role }, clients: [c], projects: [pp], media: S.media.filter(m => m.projectId === p.id),
+    invoices: team ? [] : S.invoices.filter(i => i.projectId === p.id && isSent(i)), expenses: [],
+    activity: S.activity.filter(a => a.pid === p.id && !/Facture|Relance|Paiement|Remise|Alerte|invité|retiré/.test(a.text)).slice(0, 40), urls };
+}
 function portalSnapshot(cid, urls) {
   const c = { ...client(cid) }; delete c.notes;
   const ps = S.projects.filter(p => p.clientId === cid), pids = new Set(ps.map(p => p.id));
   const settings = { ...S.settings }; delete settings.sample; delete settings.next;
-  return { settings, clients: [c], projects: ps, media: S.media.filter(m => pids.has(m.projectId)), invoices: S.invoices.filter(i => i.clientId === cid && isSent(i)), expenses: [],
+  return { settings, clients: [c], projects: ps.map(stripTokens), media: S.media.filter(m => pids.has(m.projectId)), invoices: S.invoices.filter(i => i.clientId === cid && isSent(i)), expenses: [],
     activity: S.activity.filter(a => pids.has(a.pid) && !/Facture|Relance|Paiement|Remise|Alerte/.test(a.text)).slice(0, 40), urls };
 }
 /* Applique une action envoyée depuis un espace client (validation, commentaire, approbation) */
-function applyAction(a, cid) {
-  const P = a.payload || {}, own = MODE !== 'portal';
-  const okProj = p => p && (!cid || p.clientId === cid);
-  if (a.type === 'step') {
+function applyAction(a, cid, person, pid) {
+  const P = a.payload || {}, own = MODE !== 'portal', team = person?.role === 'equipe';
+  const okProj = p => p && (!cid || p.clientId === cid) && (!pid || p.id === pid);
+  const whoName = p => person?.name || cname(client(p.clientId));
+  if ((a.type === 'step' || a.type === 'approve') && team) return;
+  if (a.type === 'resolve') {
+    const m = mediaById(P.mediaId), c = m && okProj(proj(m.projectId)) && m.comments.find(x => x.id === P.commentId); if (!c) return;
+    c.resolved = !!P.value; if (own) log(m.projectId, `${whoName(proj(m.projectId))} a ${c.resolved ? 'marqué corrigé' : 'rouvert'} un commentaire sur « ${m.name} »`);
+  } else if (a.type === 'step') {
     const p = proj(P.projectId), s = okProj(p) && p.steps.find(x => x.id === P.stepId); if (!s) return;
     s.client = !!P.value; s.clientAt = s.client ? (P.date || today()) : null;
-    if (own) log(p.id, `${cname(client(p.clientId))} a ${s.client ? 'validé' : 'annulé la validation de'} « ${s.label} »`);
+    if (own) log(p.id, `${whoName(p)} a ${s.client ? 'validé' : 'annulé la validation de'} « ${s.label} »`);
     checkCompletion(p);
   } else if (a.type === 'comment') {
     const m = mediaById(P.mediaId); if (!m || !okProj(proj(m.projectId)) || !P.comment || m.comments.some(c => c.id === P.comment.id)) return;
-    const c = P.comment; m.comments.push({ id: String(c.id), v: +c.v, t: c.t != null ? +c.t : undefined, x: c.x != null ? +c.x : undefined, y: c.y != null ? +c.y : undefined, text: String(c.text || '').slice(0, 2000), at: c.at || new Date().toISOString(), author: 'client', resolved: false });
-    if (own) log(m.projectId, `${cname(client(proj(m.projectId).clientId))} a commenté « ${m.name} »${c.t != null ? ' à ' + tc(c.t) : ''}`);
+    const c = P.comment; m.comments.push({ id: String(c.id), v: +c.v, t: c.t != null ? +c.t : undefined, x: c.x != null ? +c.x : undefined, y: c.y != null ? +c.y : undefined, text: String(c.text || '').slice(0, 2000), at: c.at || new Date().toISOString(), author: own ? (team ? 'team' : 'client') : (c.author === 'team' ? 'team' : 'client'), by: own ? (person?.name || undefined) : c.by, resolved: false });
+    if (own) log(m.projectId, `${whoName(proj(m.projectId))} a commenté « ${m.name} »${c.t != null ? ' à ' + tc(c.t) : ''}`);
   } else if (a.type === 'approve') {
     const m = mediaById(P.mediaId); if (!m || !okProj(proj(m.projectId))) return;
     m.approvedV = P.value === false ? null : +P.v; m.approvedAt = P.value === false ? null : (P.date || today());
-    if (own) log(m.projectId, m.approvedV ? `${cname(client(proj(m.projectId).clientId))} a validé la V${m.approvedV} de « ${m.name} »` : `Validation de « ${m.name} » annulée par le client`);
+    if (own) log(m.projectId, m.approvedV ? `${whoName(proj(m.projectId))} a validé la V${m.approvedV} de « ${m.name} »` : `Validation de « ${m.name} » annulée par le client`);
   }
 }
 async function portalSend(type, payload) {
@@ -984,11 +1064,11 @@ async function portalSend(type, payload) {
 }
 async function loadPortal(first) {
   const { data, error } = await sb.rpc('get_portal', { p_token: PORTAL_TOKEN });
-  if (error || !data?.data) { if (first) $('#main').innerHTML = `<div class="loading"><div class="card" style="max-width:420px;text-align:center"><h2>Lien invalide ou expiré</h2><p class="hint">Demandez un nouveau lien à votre monteur.</p></div></div>`; return; }
+  if (error || !data?.data) { if (first) $('#main').innerHTML = `<div class="loading"><div class="card" style="max-width:420px;text-align:center"><h2>Lien invalide ou expiré</h2><p class="hint">Demandez un nouveau lien à la personne qui vous a invité.</p></div></div>`; return; }
   S = migrate(data.data); S.urls = data.data.urls || {};
   (data.pending || []).forEach(a => applyAction(a));
-  view = { as: 'client', clientId: S.clients[0].id }; if (first) route = { page: 'client', id: view.clientId };
-  const b = $('#brand'); b.innerHTML = `${S.settings.logo ? `<img src="${S.settings.logo}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:#fff;padding:3px">` : '<span class="logo">' + b.querySelector('.logo').innerHTML + '</span>'}<span>${esc(S.settings.name)}<small>Espace projet</small></span>`;
+  view = { as: 'client', clientId: S.clients[0].id }; if (first) route = S.who ? { page: 'project', id: S.projects[0]?.id } : { page: 'client', id: view.clientId };
+  const b = $('#brand'); b.innerHTML = `${S.settings.logo ? `<img src="${S.settings.logo}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:#fff;padding:3px">` : '<span class="logo">' + b.querySelector('.logo').innerHTML + '</span>'}<span>${esc(S.settings.name)}<small>${S.who ? 'Invité · ' + esc(S.who.name) : 'Espace projet'}</small></span>`;
   if (first || !document.activeElement || !['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) render();
 }
 async function loadProfile() {
@@ -1035,7 +1115,7 @@ const accountCard = () => {
 };
 function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Lien copié'), () => toast(t)); }
 function sendPortal(cid) { const c = client(cid), l = portalLink(cid); openSend('Envoyer l\'espace client', [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }], `Votre espace projet · ${S.settings.name}`, `Bonjour ${c.name || ''},\n\nSuivez vos projets, validez les étapes et commentez les vidéos ici :\n${l}\n\n${S.settings.owner}`); }
-function migrate(s) { const b = blankState(); s.settings = { retentionDays: 7, ...b.settings, onboarded: !!(s.settings?.name || s.settings?.owner), ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
+function migrate(s) { const b = blankState(); if (MODE !== 'portal') (s.projects || []).forEach(p => ensurePeople(p, s.clients || [])); s.settings = { retentionDays: 7, ...b.settings, onboarded: !!(s.settings?.name || s.settings?.owner), ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
 function sampleFrame() {
   return new Promise(res => {
     const cv = document.createElement('canvas'); cv.width = 1280; cv.height = 720; const g = cv.getContext('2d');
@@ -1097,7 +1177,7 @@ function applyHash() {
 let authMode = 'login', authEmail = '', googleOn = false, appStarted = false, authBusy = false;
 const GOOGLE_SVG = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const CURRENCIES = [['€', 'Euro (€)'], ['FCFA', 'Franc CFA (FCFA)'], ['$', 'Dollar ($)'], ['MAD', 'Dirham marocain (MAD)'], ['CA$', 'Dollar canadien (CA$)'], ['CHF', 'Franc suisse (CHF)'], ['GNF', 'Franc guinéen (GNF)'], ['FC', 'Franc congolais (FC)'], ['DA', 'Dinar algérien (DA)'], ['DT', 'Dinar tunisien (DT)']];
-const JOBS = ['Monteur vidéo freelance', 'Motion designer', 'Vidéaste / réalisateur', 'Vidéaste de mariage', 'Monteur YouTube', 'Studio de post-production', 'Ingé son / mixeur', 'Autre'];
+const JOBS = ['Monteur vidéo', 'Motion designer', 'Graphiste / designer', 'Photographe', 'Vidéaste / réalisateur', 'Développeur web', 'Community manager', 'Rédacteur / traducteur', 'Ingé son / musicien', 'Architecte / décorateur', 'Studio / agence', 'Autre'];
 async function detectProviders() {
   try { const j = await (await fetch(CFG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: CFG.supabaseAnonKey } })).json(); googleOn = !!j.external?.google; } catch (e) {}
 }
@@ -1270,7 +1350,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },

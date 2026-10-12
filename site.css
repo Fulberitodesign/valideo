@@ -2,8 +2,8 @@
    Même identité que l'application : verre dépoli sombre, dégradé cyan → indigo, Sora + IBM Plex. */
 :root{
   --bg:#070a12; --bg-2:#0b1020;
-  --glass:rgba(20,26,40,.55); --glass-strong:rgba(18,23,36,.9); --edge:rgba(255,255,255,.09); --hl:rgba(255,255,255,.06);
-  --fg:#e8ecf4; --muted:#9aa5b8; --dim:#6b7588; --line:rgba(255,255,255,.08);
+  --glass:rgba(20,26,40,.55); --glass-strong:rgba(18,23,36,.9); --edge:rgba(255,255,255,.09); --hl:var(--soft);
+  --fg:#e8ecf4; --muted:#9aa5b8; --dim:#6b7588; --line:var(--soft);
   --accent:#22d3ee; --accent-2:#818cf8; --accent-deep:#0e9ab5; --indigo:#4f46e5; --accent-soft:rgba(34,211,238,.13);
   --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
   --f-display:"Sora","Segoe UI",system-ui,sans-serif;
@@ -11,8 +11,23 @@
   --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --blur:blur(20px) saturate(170%);
   --shadow:0 1px 1px rgba(0,0,0,.3),0 18px 50px -14px rgba(0,0,0,.7);
+  --text-2:#c9d1de; --soft:rgba(255,255,255,.06); --soft-2:rgba(255,255,255,.14); --nav-bg:rgba(7,10,18,.72); --on-accent:#04161b;
   color-scheme:dark;
 }
+/* Thème clair : choisi par la personne, ou suivi du système */
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --bg:#eef1f6; --bg-2:#e6eaf2; --glass:rgba(255,255,255,.66); --glass-strong:rgba(255,255,255,.94); --edge:rgba(255,255,255,.9); --hl:rgba(255,255,255,.85);
+    --fg:#0f172a; --muted:#475569; --dim:#64748b; --line:rgba(15,23,42,.1);
+    --accent:#0e7490; --accent-2:#4f46e5; --accent-deep:#0e7490; --accent-soft:rgba(14,116,144,.12); --ok:#15803d; --warn:#b45309; --bad:#c81e1e;
+    --shadow:0 1px 1px rgba(15,23,42,.04),0 18px 44px -18px rgba(15,23,42,.22);
+    --text-2:#334155; --soft:rgba(15,23,42,.05); --soft-2:rgba(15,23,42,.14); --nav-bg:rgba(238,241,246,.82); --on-accent:#ffffff;
+    color-scheme:light; } }
+:root[data-theme="light"]{ --bg:#eef1f6; --bg-2:#e6eaf2; --glass:rgba(255,255,255,.66); --glass-strong:rgba(255,255,255,.94); --edge:rgba(255,255,255,.9); --hl:rgba(255,255,255,.85);
+    --fg:#0f172a; --muted:#475569; --dim:#64748b; --line:rgba(15,23,42,.1);
+    --accent:#0e7490; --accent-2:#4f46e5; --accent-deep:#0e7490; --accent-soft:rgba(14,116,144,.12); --ok:#15803d; --warn:#b45309; --bad:#c81e1e;
+    --shadow:0 1px 1px rgba(15,23,42,.04),0 18px 44px -18px rgba(15,23,42,.22);
+    --text-2:#334155; --soft:rgba(15,23,42,.05); --soft-2:rgba(15,23,42,.14); --nav-bg:rgba(238,241,246,.82); --on-accent:#ffffff;
+    color-scheme:light; }
+:root[data-theme="dark"]{ color-scheme:dark; }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
@@ -32,7 +47,7 @@ p{margin:0}
 .glass{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--edge);box-shadow:var(--shadow),inset 0 1px 0 var(--hl)}
 
 /* Navigation */
-.topnav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top,0px);background:rgba(7,10,18,.72);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
+.topnav{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top,0px);background:var(--nav-bg);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border-bottom:1px solid var(--line)}
 .topnav .wrap{display:flex;align-items:center;gap:24px;height:64px}
 .logo{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font:700 19px var(--f-display);letter-spacing:-.02em}
 .logo img{width:30px;height:30px;border-radius:9px;box-shadow:0 6px 16px -4px rgba(34,211,238,.5)}
@@ -43,9 +58,9 @@ p{margin:0}
 @media (max-width:860px){.links{display:none}}
 
 /* Boutons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:12px;font:600 15px var(--f-body);text-decoration:none;color:var(--fg);border:1px solid var(--line);background:rgba(255,255,255,.04);transition:transform .15s,box-shadow .2s,border-color .2s;white-space:nowrap;cursor:pointer}
-.btn:hover{border-color:rgba(255,255,255,.25);transform:translateY(-1px)}
-.btn.primary{background:linear-gradient(135deg,var(--accent),#6d8cf6);color:#04161b;border-color:transparent;box-shadow:0 10px 30px -10px rgba(34,211,238,.7)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:12px;font:600 15px var(--f-body);text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--soft);transition:transform .15s,box-shadow .2s,border-color .2s;white-space:nowrap;cursor:pointer}
+.btn:hover{border-color:var(--muted);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),#6d8cf6);color:var(--on-accent);border-color:transparent;box-shadow:0 10px 30px -10px rgba(34,211,238,.7)}
 .btn.primary:hover{box-shadow:0 14px 36px -10px rgba(34,211,238,.85)}
 .btn.sm{padding:8px 14px;font-size:14px;border-radius:10px}
 
@@ -71,9 +86,14 @@ p{margin:0}
 .shot{border-radius:16px;padding:8px;position:relative}
 .shot img{border-radius:10px;width:100%;height:auto}
 .shot .bar{display:flex;gap:6px;padding:4px 6px 10px}
-.shot .bar i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.14)}
+.shot .bar i{width:10px;height:10px;border-radius:50%;background:var(--soft-2)}
 
 .footer{border-top:1px solid var(--line);padding-block:32px calc(32px + env(safe-area-inset-bottom,0px));color:var(--dim);font-size:14px}
 .footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .footer a{color:var(--muted);text-decoration:none;margin-left:18px}
 .footer a:hover{color:var(--fg)}
+
+/* Bouton de thème */
+.theme-btn{gap:6px}
+.theme-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+@media (max-width:560px){.theme-btn span{display:none}}

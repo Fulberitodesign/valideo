@@ -9,6 +9,7 @@
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="site.css">
@@ -27,7 +28,7 @@
 .toc li{counter-increment:t}
 .toc a{display:flex;gap:10px;padding:6px 12px;border-radius:9px;color:var(--muted);text-decoration:none;font-size:14px;line-height:1.35}
 .toc a::before{content:counter(t,decimal-leading-zero);font:500 12px var(--f-mono);color:var(--dim);padding-top:1px}
-.toc a:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.toc a:hover{background:var(--soft);color:var(--fg)}
 .toc a.on{background:rgba(34,211,238,.1);color:var(--fg)}
 .toc a.on::before{color:var(--accent)}
 @media (max-width:980px){.g-layout{grid-template-columns:minmax(0,1fr)}.toc{position:static;max-height:none}}
@@ -37,13 +38,13 @@
 .doc .kicker{font:600 12px var(--f-mono);color:var(--accent);letter-spacing:.06em}
 .doc h2{font-size:clamp(24px,2.8vw,32px);font-weight:700}
 .doc h3{font-size:18px;font-weight:600;margin-top:8px}
-.doc p,.doc li{color:#c9d1de;font-size:16px;max-width:72ch}
+.doc p,.doc li{color:var(--text-2);font-size:16px;max-width:72ch}
 .doc strong{color:var(--fg)}
 .doc ol.how{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:12px}
 .doc ol.how li{counter-increment:s;display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:start}
-.doc ol.how li::before{content:counter(s);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--f-display);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04161b}
+.doc ol.how li::before{content:counter(s);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--f-display);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent)}
 .doc ul.dots{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
-.ui{display:inline-block;padding:1px 8px;border-radius:7px;font:500 14px var(--f-body);background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--fg);white-space:nowrap}
+.ui{display:inline-block;padding:1px 8px;border-radius:7px;font:500 14px var(--f-body);background:var(--soft);border:1px solid var(--line);color:var(--fg);white-space:nowrap}
 figure{margin:6px 0 0;display:flex;flex-direction:column;gap:10px}
 figure .shot{padding:6px}
 figcaption{font-size:13.5px;color:var(--dim);padding-left:4px}
@@ -51,7 +52,7 @@ figcaption{font-size:13.5px;color:var(--dim);padding-left:4px}
 .tip.warn{border-left-color:var(--warn)}
 .tip b{font:700 12px var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding-top:3px}
 .tip.warn b{color:var(--warn)}
-.tip p{color:#c9d1de;font-size:15px}
+.tip p{color:var(--text-2);font-size:15px}
 .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:760px){.grid2{grid-template-columns:minmax(0,1fr)}}
 .mini{border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
@@ -61,11 +62,11 @@ figcaption{font-size:13.5px;color:var(--dim);padding-left:4px}
 table{width:100%;border-collapse:collapse;font-size:14.5px}
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font:600 11.5px var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
-td{color:#c9d1de}
+td{color:var(--text-2)}
 tr:last-child td{border-bottom:0}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap}
 .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.p-ok{background:rgba(74,222,128,.12);color:var(--ok)}.p-warn{background:rgba(251,191,36,.12);color:var(--warn)}.p-bad{background:rgba(248,113,113,.13);color:var(--bad)}.p-info{background:rgba(129,140,248,.14);color:#a5b4fc}.p-n{background:rgba(255,255,255,.06);color:var(--muted)}
+.p-ok{background:rgba(74,222,128,.12);color:var(--ok)}.p-warn{background:rgba(251,191,36,.12);color:var(--warn)}.p-bad{background:rgba(248,113,113,.13);color:var(--bad)}.p-info{background:rgba(129,140,248,.14);color:var(--accent-2)}.p-n{background:var(--soft);color:var(--muted)}
 .toplink{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--fg);text-decoration:none;font-size:18px;z-index:20}
 </style>
 </head>
@@ -74,7 +75,7 @@ tr:last-child td{border-bottom:0}
   <div class="wrap">
     <a class="logo" href="./"><img src="icon-192.png" alt="" width="30" height="30">Validéo</a>
     <nav class="links" aria-label="Sections"><a href="./">Accueil</a><a href="#demarrer">Démarrer</a><a href="#factures">Factures</a><a href="#depannage">Dépannage</a></nav>
-    <div class="nav-cta"><a class="btn sm primary" href="app.html">Ouvrir Validéo</a></div>
+    <div class="nav-cta"><button class="btn sm theme-btn" data-theme-btn onclick="cycleTheme()" type="button">Thème</button><a class="btn sm primary" href="app.html">Ouvrir Validéo</a></div>
   </div>
 </header>
 
@@ -95,7 +96,7 @@ tr:last-child td{border-bottom:0}
       <li><a href="#clients">Ajouter un client</a></li>
       <li><a href="#projets">Créer un projet</a></li>
       <li><a href="#etapes">Valider les étapes</a></li>
-      <li><a href="#participants">Participants et alertes</a></li>
+      <li><a href="#participants">Invitations, équipe et alertes</a></li>
       <li><a href="#revisions">Révisions des médias</a></li>
       <li><a href="#stockage">Suppression automatique</a></li>
       <li><a href="#espace-client">L'espace client</a></li>
@@ -118,8 +119,9 @@ tr:last-child td{border-bottom:0}
       <p>En haut, trois repères :</p>
       <ul class="dots">
         <li><span class="ui">? Guide d'utilisation</span> ouvre ce guide.</li>
+        <li>Le bouton <span class="ui">Thème</span> passe de <em>Auto</em> (comme ton appareil) à <em>Clair</em> puis <em>Sombre</em>.</li>
         <li>L'<strong>état de synchronisation</strong> : <em>Synchronisé</em>, <em>Hors ligne</em> ou <em>Non connecté</em>. Clique dessus pour aller à ton compte.</li>
-        <li>Le sélecteur <span class="ui">Affichage</span> : <em>Ma vue (monteur)</em> ou la vue d'un client, pour voir exactement ce qu'il voit.</li>
+        <li>Le sélecteur <span class="ui">Affichage</span> : <em>Ma vue (prestataire)</em> ou la vue d'un client, pour voir exactement ce qu'il voit.</li>
       </ul>
       <figure><div class="shot glass"><img src="guide/img/dashboard.png" alt="Tableau de bord de Validéo" loading="lazy" width="1440" height="900"></div><figcaption>Le tableau de bord : chiffres clés, éléments « À traiter », projets en cours et dernières activités.</figcaption></figure>
     </section>
@@ -185,24 +187,37 @@ tr:last-child td{border-bottom:0}
     <section id="etapes">
       <span class="kicker">06 · VALIDATION</span>
       <h2>Valider les étapes</h2>
-      <p>Une étape n'est terminée que lorsqu'elle est <strong>validée des deux côtés</strong>. La barre d'avancement en tient compte : une validation sur deux compte pour moitié.</p>
+      <p>Une étape n'est terminée que lorsqu'elle est <strong>validée des deux côtés</strong>. En haut du projet, la <strong>barre d'étapes</strong> montre où tu en es : chaque étape terminée passe au <strong>vert</strong> avec une coche, l'étape en cours est signalée par une flèche, et un cercle en pointillés vert indique qu'un seul des deux côtés a validé.</p>
       <div class="grid2">
         <div class="mini glass"><h4>De ton côté</h4><p>Coche <span class="ui">Moi</span> quand l'étape est faite. Si le client t'a dit « c'est bon » par message, tu peux aussi cocher <span class="ui">Client</span> pour lui.</p></div>
         <div class="mini glass"><h4>Du côté du client</h4><p>Il ne voit pas de cases à cocher : il voit l'état de l'étape et un bouton <span class="ui">Valider l'étape</span>, mis en avant quand l'étape est prête.</p></div>
       </div>
-      <figure><div class="shot glass"><img src="guide/img/project.png" alt="Page projet côté monteur avec les étapes et les cases Moi et Client" loading="lazy" width="1440" height="1000"></div><figcaption>Côté monteur : chaque étape a ses deux validations, sa date, et peut être renommée ou supprimée.</figcaption></figure>
+      <figure><div class="shot glass"><img src="guide/img/project.png" alt="Page projet côté prestataire avec la barre d'étapes et les cases Moi et Client" loading="lazy" width="1440" height="1000"></div><figcaption>Côté monteur : chaque étape a ses deux validations, sa date, et peut être renommée ou supprimée.</figcaption></figure>
       <p>Après chaque validation, un message propose <span class="ui">Prévenir</span> : il prépare l'alerte d'avancement pour les participants.</p>
       <div class="tip glass"><b>Automatique</b><p>Dès que la dernière étape est validée des deux côtés, le projet passe en <strong>Terminé</strong> et sa <strong>facture finale est générée</strong>, à vérifier (voir chapitre 11).</p></div>
     </section>
 
     <section id="participants">
-      <span class="kicker">07 · ALERTES</span>
-      <h2>Participants et alertes email / WhatsApp</h2>
-      <p>Dans un projet, carte <strong>Participants</strong>, ajoute les personnes qui suivent le projet avec le client : directrice artistique, chargé de com, producteur… avec leur email et/ou leur WhatsApp.</p>
+      <span class="kicker">07 · ÉQUIPE</span>
+      <h2>Invitations, équipe et alertes</h2>
+      <p>Dès que tu crées un projet, Validéo <strong>génère automatiquement le lien d'invitation</strong> de ton client et te propose de l'envoyer par email ou WhatsApp. Chaque personne invitée a <strong>son propre lien</strong>, sans inscription : ses validations et commentaires portent son nom.</p>
+      <h3>Ajouter des personnes</h3>
       <ol class="how">
-        <li><p>Clique sur <span class="ui">Prévenir les participants</span>. Le message d'avancement est déjà rédigé : pourcentage, étapes terminées, prochaine étape, date de livraison, et le lien de l'espace client si tu es connecté.</p></li>
-        <li><p>Modifie le texte si tu veux.</p></li>
-        <li><p>Clique sur <span class="ui">Email</span> ou <span class="ui">WhatsApp</span> à côté de chaque personne : ta messagerie ou WhatsApp s'ouvre avec le message prêt. Il ne reste qu'à envoyer.</p></li>
+        <li><p>Dans le projet, carte <strong>Équipe et invitations</strong>, clique sur <span class="ui">Ajouter</span>.</p></li>
+        <li><p>Indique le nom, le rôle sur le projet (directrice artistique, étalonneur, développeur…), l'email et/ou le WhatsApp, puis choisis l'accès.</p></li>
+        <li><p>Clique sur <span class="ui">Ajouter et inviter</span> : son lien est prêt à copier ou à envoyer.</p></li>
+      </ol>
+      <div class="tbl-wrap glass"><table>
+        <thead><tr><th>Accès</th><th>Ce que la personne peut faire</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-ok">Client</span></td><td>Suivre l'avancement, valider les étapes et les versions, commenter les fichiers, consulter les factures du projet.</td></tr>
+          <tr><td><span class="pill p-info">Équipe</span></td><td>Voir le projet et les fichiers, commenter, marquer les corrections faites. Ne voit ni les montants ni les factures, et ne valide pas à la place du client.</td></tr>
+        </tbody></table></div>
+      <p>Le bouton <span class="ui">Inviter</span> à côté de chaque personne, ou <span class="ui">Liens d'invitation</span>, réaffiche les liens à tout moment. Retirer une personne coupe son accès.</p>
+      <h3>Prévenir de l'avancement</h3>
+      <ol class="how">
+        <li><p>Clique sur <span class="ui">Prévenir les participants</span>. Le message est déjà rédigé : pourcentage, étapes terminées, prochaine étape, date de livraison.</p></li>
+        <li><p>Clique sur <span class="ui">Email</span> ou <span class="ui">WhatsApp</span> à côté de chaque personne : son lien personnel est ajouté au message.</p></li>
       </ol>
       <div class="tip glass warn"><b>Important</b><p>Validéo prépare les messages mais ne les envoie pas à ta place : c'est toi qui appuies sur Envoyer dans ta messagerie ou dans WhatsApp.</p></div>
     </section>

@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Validéo · Vos clients valident, vous facturez</title>
-<meta name="description" content="Validéo, l'outil des monteurs vidéo : étapes validées par le client, retours au timecode, espace client privé, facture générée automatiquement et suivi des impayés. Fonctionne hors ligne.">
+<meta name="description" content="Validéo, l'outil de suivi de projets pour freelances, studios et agences : étapes validées par le client, retours au bon endroit, espace client privé, facture générée automatiquement et suivi des impayés. Fonctionne hors ligne.">
 <meta name="theme-color" content="#070a12">
 <meta property="og:title" content="Validéo · Vos clients valident, vous facturez">
-<meta property="og:description" content="Suivi de projets vidéo, validation client, révisions commentées et facturation automatique pour monteurs.">
+<meta property="og:description" content="Suivi de projets, validation client, révisions commentées et facturation automatique pour freelances, studios et agences.">
 <meta property="og:image" content="https://fulberitodesign.github.io/valideo/guide/img/hero.png">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://fulberitodesign.github.io/valideo/">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="theme.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -60,7 +61,7 @@
 
 /* Étapes */
 .steps .card{position:relative}
-.num{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--f-display);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04161b}
+.num{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--f-display);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent)}
 
 /* Pour qui */
 .who{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
@@ -69,14 +70,14 @@
 /* Tarifs */
 .period{display:inline-flex;padding:4px;border-radius:12px;gap:2px;margin:0 auto 28px}
 .period button{all:unset;cursor:pointer;padding:7px 16px;border-radius:9px;font-size:14px;color:var(--muted)}
-.period button.on{background:rgba(255,255,255,.08);color:var(--fg);font-weight:600}
+.period button.on{background:var(--soft);color:var(--fg);font-weight:600}
 .period em{font-style:normal;font-size:12px;color:var(--ok);margin-left:6px}
 .plans{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}
 @media (max-width:1000px){.plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.plans{grid-template-columns:minmax(0,1fr)}}
 .plan{border-radius:20px;padding:24px 22px;display:flex;flex-direction:column;gap:14px;position:relative}
 .plan.hot{border-color:rgba(34,211,238,.55);box-shadow:0 0 0 1px rgba(34,211,238,.35),0 24px 60px -20px rgba(34,211,238,.45)}
-.plan .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:999px;font:600 12px var(--f-body);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04161b;white-space:nowrap}
+.plan .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 12px;border-radius:999px;font:600 12px var(--f-body);background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent);white-space:nowrap}
 .plan h3{font-size:18px}
 .plan .for{color:var(--muted);font-size:14px;min-height:42px}
 .price{display:flex;align-items:baseline;gap:6px}
@@ -84,7 +85,7 @@
 .price span{color:var(--muted);font-size:14px}
 .fcfa{font:500 13px var(--f-mono);color:var(--dim);margin-top:-8px}
 .plan ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
-.plan li{display:flex;gap:9px;font-size:14.5px;color:#c9d1de}
+.plan li{display:flex;gap:9px;font-size:14.5px;color:var(--text-2)}
 .plan li::before{content:"✓";color:var(--accent);font-weight:700}
 .plan li.soon{color:var(--dim)}
 .plan .btn{width:100%}
@@ -120,16 +121,16 @@
       <a href="#faq">FAQ</a>
       <a href="guide.html">Guide d'utilisation</a>
     </nav>
-    <div class="nav-cta"><a class="btn sm" href="app.html">Se connecter</a><a class="btn sm primary" href="app.html#inscription">Créer un compte</a></div>
+    <div class="nav-cta"><button class="btn sm theme-btn" data-theme-btn onclick="cycleTheme()" type="button">Thème</button><a class="btn sm" href="app.html">Se connecter</a><a class="btn sm primary" href="app.html#inscription">Créer un compte</a></div>
   </div>
 </header>
 
 <main>
   <section class="hero">
     <div class="wrap">
-      <span class="badge glass"><i></i>Vidéo · Audio · Image</span>
+      <span class="badge glass"><i></i>Vidéo · Design · Photo · Son · Web</span>
       <h1>Tes clients valident.<br><span class="grad">Tu factures.</span></h1>
-      <p class="lead">L'outil de suivi pour monteurs vidéo. Chaque étape validée des deux côtés, les retours posés au timecode près, et la facture prête dès que le projet est terminé.</p>
+      <p class="lead">L'outil de suivi de projets pour les freelances, les studios et les agences. Chaque étape validée des deux côtés, les retours posés au bon endroit, et la facture prête dès que le projet est terminé.</p>
       <div class="ctas"><a class="btn primary" href="app.html#inscription">Commencer gratuitement</a><a class="btn" href="app.html?demo">Essayer la démo</a><a class="btn" href="guide.html">Guide d'utilisation</a></div>
       <div class="fine"><span>Fonctionne hors ligne</span><span>Lien client sans inscription</span><span>Factures à ton image</span></div>
       <div class="hero-shot">
@@ -143,7 +144,7 @@
 
   <section class="section" id="probleme">
     <div class="wrap">
-      <div class="section-head"><span class="eyebrow">Le problème</span><h2>Le montage, tu gères. Le suivi client, beaucoup moins.</h2><p>Les retours arrivent par vocal, par mail et par message. Personne ne sait ce qui est validé, et la facture part en retard.</p></div>
+      <div class="section-head"><span class="eyebrow">Le problème</span><h2>Ton métier, tu le maîtrises. Le suivi client, beaucoup moins.</h2><p>Les retours arrivent par vocal, par mail et par message. Personne ne sait ce qui est validé, et la facture part en retard.</p></div>
       <div class="cards">
         <div class="card glass"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4z"/><path d="M8 9h8M8 12h5"/></svg></span><h3>Des retours éparpillés</h3><p>« À 1 min 12, le plan est trop sombre. » Mais lequel, dans quelle version, et dans quelle conversation ?</p></div>
         <div class="card glass"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4M12 16h.01"/></svg></span><h3>Des validations floues</h3><p>Le client dit « ça me va » au téléphone, puis demande une 4e version. Rien n'est écrit nulle part.</p></div>
@@ -157,7 +158,7 @@
       <div class="section-head"><span class="eyebrow">Fonctionnalités</span><h2>Tout ton suivi de projet, du brief au paiement</h2><p>Validéo garde la trace de chaque validation, de chaque retour et de chaque euro.</p></div>
 
       <div class="show">
-        <div class="txt"><span class="eyebrow">Révisions</span><h3>Des retours posés au bon endroit</h3><p>Ton client commente la vidéo à l'image près, ou clique directement sur un point de l'image. Tu corriges, tu envoies la V2, et tu coches au fur et à mesure.</p>
+        <div class="txt"><span class="eyebrow">Révisions</span><h3>Des retours posés au bon endroit</h3><p>Ton client commente une vidéo ou un son à l'instant près, ou clique sur l'endroit exact d'une maquette, d'une photo ou d'un visuel. Tu corriges, tu envoies la V2, et tu coches au fur et à mesure.</p>
           <ul><li>Commentaires attachés au timecode, repères sur la timeline</li><li>Points précis sur les images</li><li>Versions V1, V2… jusqu'à la version finale validée</li></ul></div>
         <div class="shot glass"><img src="guide/img/media.png" alt="Page de révision : image commentée avec des points numérotés et la liste des commentaires" loading="lazy" width="1440" height="900"></div>
       </div>
@@ -172,6 +173,12 @@
         <div class="txt"><span class="eyebrow">Facturation</span><h3>La facture se prépare toute seule</h3><p>Quand la dernière étape est validée, la facture est générée au bon montant, acomptes déduits. Tu vérifies, tu appliques une remise si besoin, et tu l'envoies.</p>
           <ul><li>6 modèles de facture, ton logo, ta couleur</li><li>Signature et cachet automatiques</li><li>Export PDF, envoi par email ou WhatsApp</li></ul></div>
         <div class="shot glass"><img src="guide/img/invoice.png" alt="Facture générée automatiquement en attente de vérification, avec remise et bouton Valider et envoyer" loading="lazy" width="1680" height="1150"></div>
+      </div>
+
+      <div class="show">
+        <div class="txt"><span class="eyebrow">Invitations et équipe</span><h3>Un lien d'invitation dès la création du projet</h3><p>Au moment où tu crées un projet, Validéo génère le lien d'invitation de ton client. Ajoute autant de personnes que tu veux : contacts du client et membres de ton équipe, chacun avec son accès.</p>
+          <ul><li>Lien personnel envoyé par email ou WhatsApp, sans inscription</li><li>Rôle Client : valide les étapes et les versions</li><li>Rôle Équipe : commente et marque les corrections, sans voir les montants</li></ul></div>
+        <div class="shot glass"><img src="guide/img/project.png" alt="Page projet : barre d'étapes, équipe et invitations" loading="lazy" width="1440" height="1000"></div>
       </div>
 
       <div class="show rev">
@@ -212,7 +219,7 @@
           <div class="price"><b>0 €</b><span>pour toujours</span></div><div class="fcfa">0 FCFA</div>
           <ul><li>2 projets en cours</li><li>3 clients</li><li>Révisions au timecode et sur image</li><li>Espace client privé</li><li>Facture générée automatiquement</li></ul>
           <a class="btn" href="app.html#inscription">Commencer gratuitement</a></div>
-        <div class="plan glass"><h3>Solo</h3><p class="for">Pour le monteur freelance avec quelques clients réguliers.</p>
+        <div class="plan glass"><h3>Solo</h3><p class="for">Pour le freelance avec quelques clients réguliers.</p>
           <div class="price"><b data-m="9 €" data-y="90 €">9 €</b><span data-m="/ mois" data-y="/ an">/ mois</span></div><div class="fcfa" data-m="≈ 5 900 FCFA / mois" data-y="≈ 59 000 FCFA / an">≈ 5 900 FCFA / mois</div>
           <ul><li>10 projets en cours</li><li>Clients illimités</li><li>6 modèles de facture à ton image</li><li>Relances et comptabilité</li><li>Export CSV pour le comptable</li></ul>
           <a class="btn" href="app.html#inscription">Choisir Solo</a></div>
@@ -222,7 +229,7 @@
           <a class="btn primary" href="app.html#inscription">Choisir Pro</a></div>
         <div class="plan glass"><h3>Studio</h3><p class="for">Pour les studios et les petites équipes de post-production.</p>
           <div class="price"><b data-m="39 €" data-y="390 €">39 €</b><span data-m="/ mois" data-y="/ an">/ mois</span></div><div class="fcfa" data-m="≈ 25 600 FCFA / mois" data-y="≈ 255 800 FCFA / an">≈ 25 600 FCFA / mois</div>
-          <ul><li>Tout ce qu'inclut Pro</li><li>Accompagnement à la prise en main</li><li>Volume de projets illimité</li><li class="soon">Jusqu'à 5 monteurs (bientôt)</li></ul>
+          <ul><li>Tout ce qu'inclut Pro</li><li>Accompagnement à la prise en main</li><li>Volume de projets illimité</li><li>Équipes et invités illimités sur chaque projet</li></ul>
           <a class="btn" href="app.html#inscription">Choisir Studio</a></div>
       </div>
       <div class="paynote"><div class="chips"><span>MTN MoMo</span><span>Orange Money</span><span>Moov Money</span><span>Wave</span><span>Carte bancaire</span></div>
@@ -232,8 +239,8 @@
 
   <section class="section" id="pourqui" style="padding-top:0">
     <div class="wrap">
-      <div class="section-head"><span class="eyebrow">Pour qui</span><h2>Pensé pour celles et ceux qui livrent de l'image</h2></div>
-      <div class="who"><span class="glass">Monteurs freelances</span><span class="glass">Motion designers</span><span class="glass">Vidéastes de mariage</span><span class="glass">Monteurs YouTube</span><span class="glass">Studios de post-production</span><span class="glass">Ingés son et mixeurs</span></div>
+      <div class="section-head"><span class="eyebrow">Pour qui</span><h2>Pour tous ceux qui livrent des projets à faire valider</h2><p>Tu travailles seul ou en équipe, pour des clients qui doivent relire, commenter et valider : Validéo est fait pour toi.</p></div>
+      <div class="who"><span class="glass">Monteurs vidéo</span><span class="glass">Motion designers</span><span class="glass">Graphistes et designers</span><span class="glass">Photographes</span><span class="glass">Vidéastes et réalisateurs</span><span class="glass">Développeurs web</span><span class="glass">Community managers</span><span class="glass">Rédacteurs et traducteurs</span><span class="glass">Ingés son et musiciens</span><span class="glass">Architectes et décorateurs</span><span class="glass">Studios et agences</span></div>
     </div>
   </section>
 
@@ -241,7 +248,9 @@
     <div class="wrap">
       <div class="section-head"><span class="eyebrow">Questions fréquentes</span><h2>Tout ce que tu veux savoir</h2></div>
       <div class="faq">
-        <details class="glass"><summary>Mon client doit-il créer un compte ?</summary><p>Non. Il reçoit un lien privé vers son espace. Il peut y valider les étapes, commenter les médias et consulter ses factures sans inscription.</p></details>
+        <details class="glass"><summary>Mon client doit-il créer un compte ?</summary><p>Non. Dès que tu crées un projet, un lien d'invitation est généré pour ton client. Il peut y valider les étapes, commenter les fichiers et consulter ses factures sans inscription.</p></details>
+        <details class="glass"><summary>Puis-je travailler en équipe sur un projet ?</summary><p>Oui. Ajoute autant de personnes que nécessaire : contacts du client ou membres de ton équipe. Chacun reçoit son propre lien, et ses commentaires portent son nom. Les membres de l'équipe ne voient pas les montants.</p></details>
+        <details class="glass"><summary>Validéo est-il réservé aux monteurs vidéo ?</summary><p>Non. Il convient à tous les freelances, studios et agences qui livrent des projets à faire valider : graphisme, photo, motion design, son, développement web, rédaction…</p></details>
         <details class="glass"><summary>Ça marche sans connexion internet ?</summary><p>Oui. Tes données sont enregistrées sur ton appareil. Dès que tu te connectes à ton compte en ligne, elles se synchronisent entre tes appareils et avec les espaces clients.</p></details>
         <details class="glass"><summary>Quels fichiers puis-je faire relire ?</summary><p>Vidéos, sons et images. Les vidéos et les sons se commentent au timecode, les images à un endroit précis. Pour l'envoi en ligne, préfère des versions de relecture légères (720p) : 50 Mo maximum par fichier.</p></details>
         <details class="glass"><summary>Les messages aux clients partent-ils tout seuls ?</summary><p>Validéo prépare le message (avancement, nouvelle version, facture, relance) et ouvre ta messagerie ou WhatsApp avec le texte prêt. Tu n'as plus qu'à appuyer sur Envoyer.</p></details>

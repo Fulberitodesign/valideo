@@ -1,6 +1,6 @@
 // Validéo : fonctionnement hors ligne (cache de l'application)
-const CACHE = 'valideo-v6';
-const SHELL = ['./', './index.html', './app.html', './guide.html', './app.js', './config.js', './manifest.webmanifest', './icon.svg',
+const CACHE = 'valideo-v7';
+const SHELL = ['./', './index.html', './app.html', './guide.html', './app.js', './theme.js', './site.css', './config.js', './manifest.webmanifest', './icon.svg',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
 
 self.addEventListener('install', e => {
