@@ -393,7 +393,7 @@ function pProject(id) {
   const c = client(p.clientId), own = isOwner(), pr = progress(p);
   const meds = S.media.filter(m => m.projectId === p.id);
   const invs = S.invoices.filter(i => invHas(i, p.id) && (own || isSent(i)));
-  const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final');
+  const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final') || projectBilled(p.id) >= (+p.amount || 0) - .005;
   return `<div class="crumbs">${own ? `<a onclick="App.go('projects')">Projets</a> / <a onclick="App.go('client','${c.id}')">${esc(cname(c))}</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
   <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>${canMoney() ? `·<span class="mono">${fmt(p.amount)} HT</span>` : ''}${deadlinePill(p)}</div></div>
   ${own ? `<div class="row"><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
