@@ -418,6 +418,50 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .vtoggle button:focus-visible{outline:2px solid var(--accent)}
 .vtoggle svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
 
+/* ======== Accès : connexion et inscription ======== */
+.auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.auth-side{position:relative;overflow:hidden;padding:44px clamp(24px,4vw,64px);display:flex;flex-direction:column;gap:26px;border-right:1px solid var(--line);background:linear-gradient(160deg,rgba(14,154,181,.16),rgba(79,70,229,.12) 60%,transparent)}
+.auth-logo{display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none;font:700 20px var(--f-display);letter-spacing:-.02em}
+.auth-logo img{width:34px;height:34px;border-radius:10px;box-shadow:0 6px 18px -4px var(--accent)}
+.auth-side h1{font-size:clamp(30px,3.6vw,46px);font-weight:700;margin-top:auto}
+.auth-side .grad{background:linear-gradient(100deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.auth-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;color:var(--fg)}
+.auth-points li{display:flex;gap:10px;align-items:center}
+.auth-points li::before{content:"✓";width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);flex:none}
+.auth-shot{border-radius:14px;border:1px solid var(--glass-edge);box-shadow:var(--shadow);margin-bottom:auto;max-height:42vh;object-fit:cover;object-position:top left;width:100%}
+.auth-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px 20px}
+.auth-card{width:min(440px,100%);border-radius:22px;padding:30px 28px;display:flex;flex-direction:column;gap:14px;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);box-shadow:var(--shadow),inset 0 1px 0 var(--hl)}
+.auth-card h2{font-size:24px}
+.auth-card p{margin:0}
+.auth-form{display:flex;flex-direction:column;gap:14px;margin-top:4px}
+.auth-form .btn{padding:11px 16px;font-size:15px}
+.auth-form .btn:disabled{opacity:.6;cursor:wait}
+.auth-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.field em{font-style:normal;color:var(--muted);font-weight:400}
+.lbl-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--muted);cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.g-btn{background:#fff;color:#1f1f1f;border-color:#dadce0;font-weight:600;padding:11px 16px;width:100%}
+.g-btn:hover{border-color:#bdc1c6;box-shadow:0 4px 14px -6px rgba(0,0,0,.35)}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.switch{text-align:center;font-size:14px;color:var(--muted)}
+.pw{height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden;margin-top:2px}
+.pw i{display:block;height:100%;width:0;transition:width .2s,background .2s}
+.pw i.weak{background:var(--bad)}.pw i.mid{background:var(--warn)}.pw i.strong{background:var(--ok)}
+.auth-steps{list-style:none;margin:0 0 4px;padding:0;display:flex;gap:6px;font-size:12.5px;color:var(--muted)}
+.auth-steps li{flex:1;display:flex;align-items:center;gap:7px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+.auth-steps span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--f-display);background:var(--surface-2)}
+.auth-steps li.on{color:var(--fg);border-color:var(--accent)}
+.auth-steps li.on span{background:var(--accent);color:var(--accent-fg)}
+.auth-steps li.done{border-color:var(--ok)}
+.auth-steps li.done span{background:var(--ok-soft);color:var(--ok)}
+.auth-icon{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:24px;background:var(--accent-soft);color:var(--accent)}
+.auth-foot{font-size:13.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.auth-foot a{color:var(--muted);text-decoration:none}
+.auth-foot a:hover{color:var(--fg)}
+@media (max-width:900px){.auth{grid-template-columns:minmax(0,1fr)}.auth-side{padding:24px 20px 8px;gap:14px;border-right:0;background:none}.auth-side h1,.auth-points,.auth-shot{display:none}.auth-main{justify-content:flex-start;padding-top:12px}}
+
 @media print{
   @page{size:A4;margin:0}
   body{background:#fff}
@@ -429,7 +473,19 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </style>
 </head>
 <body>
-<div class="app">
+<div class="auth" id="auth" hidden>
+  <aside class="auth-side">
+    <a class="auth-logo" href="./"><img src="icon-192.png" alt="" width="34" height="34">Validéo</a>
+    <h1>Tes clients valident.<br><span class="grad">Tu factures.</span></h1>
+    <ul class="auth-points"><li>Étapes validées des deux côtés</li><li>Retours posés au timecode, versions V1 à finale</li><li>Facture prête dès la fin du projet</li></ul>
+    <img class="auth-shot" src="guide/img/client-project.png" alt="Aperçu d'un projet dans Validéo">
+  </aside>
+  <div class="auth-main">
+    <div class="auth-card" id="auth-card" aria-live="polite"></div>
+    <p class="auth-foot"><a href="./">Accueil</a><a href="./#offres">Tarifs</a><a href="guide.html" target="_blank" rel="noopener">Guide d'utilisation</a><a href="app.html?demo">Essayer la démo</a></p>
+  </div>
+</div>
+<div class="app" hidden>
   <aside class="side">
     <div class="brand" id="brand"><span class="logo"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.2 8.6 14.6 15.5 5.6"/></svg></span><span>Validéo</span></div>
     <nav class="nav" id="nav"></nav>

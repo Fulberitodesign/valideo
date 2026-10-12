@@ -274,7 +274,7 @@ function pDashboard() {
   const active = S.projects.filter(p => p.status !== 'termine').sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
   const recent = S.activity.slice(0, 6);
   const fresh = !DEMO && !S.clients.length && !S.projects.length;
-  return `${fresh ? `<section class="card" style="margin-bottom:18px"><div class="card-h"><h2>Bienvenue sur Validéo</h2><a class="link" href="guide.html" target="_blank" rel="noopener">Lire le guide</a></div><div class="alerts">${[['1', 'Renseigne ton identité', 'Nom, logo, couleur, signature : tes factures seront à ton image.', 'settings', S.settings.name ? 'Fait' : ''], ['2', 'Ajoute ton premier client', 'Son email et son WhatsApp pour lui envoyer les alertes.', 'clients', ''], ['3', 'Crée ton premier projet', 'Montant, date de livraison et étapes à valider.', 'projects', '']].map(([n, t, d, pg, done]) => `<div class="alert ${done ? 'ok' : 'info'}"><span class="sev"></span><div><div class="a-t">${n}. ${t}</div><div class="a-s">${d}</div></div><button class="btn sm ${done ? '' : 'primary'}" onclick="${pg === 'clients' ? 'App.editClient()' : pg === 'projects' ? 'App.editProject()' : `App.go('${pg}')`}">${done || 'Commencer'}</button></div>`).join('')}</div>${user ? '' : `<p class="hint">Pense à <a onclick="App.go('settings')">créer ton compte en ligne</a> pour retrouver tes données sur tous tes appareils.</p>`}</section>` : ''}${DEMO ? `<div class="banner"><span><b>Mode démo</b> : clients, projets et factures fictifs. Rien n'est enregistré en ligne. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><a class="btn sm primary" href="app.html#/settings">Créer mon compte</a></div>` : S.settings.sample ? `<div class="banner"><span>Cet appareil contient encore des <b>données d'exemple</b>.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
+  return `${fresh ? `<section class="card" style="margin-bottom:18px"><div class="card-h"><h2>Bienvenue sur Validéo</h2><a class="link" href="guide.html" target="_blank" rel="noopener">Lire le guide</a></div><div class="alerts">${[['1', 'Renseigne ton identité', 'Nom, logo, couleur, signature : tes factures seront à ton image.', 'settings', S.settings.name ? 'Fait' : ''], ['2', 'Ajoute ton premier client', 'Son email et son WhatsApp pour lui envoyer les alertes.', 'clients', ''], ['3', 'Crée ton premier projet', 'Montant, date de livraison et étapes à valider.', 'projects', '']].map(([n, t, d, pg, done]) => `<div class="alert ${done ? 'ok' : 'info'}"><span class="sev"></span><div><div class="a-t">${n}. ${t}</div><div class="a-s">${d}</div></div><button class="btn sm ${done ? '' : 'primary'}" onclick="${pg === 'clients' ? 'App.editClient()' : pg === 'projects' ? 'App.editProject()' : `App.go('${pg}')`}">${done || 'Commencer'}</button></div>`).join('')}</div>${user ? '' : `<p class="hint">Pense à <a onclick="App.go('settings')">créer ton compte en ligne</a> pour retrouver tes données sur tous tes appareils.</p>`}</section>` : ''}${DEMO ? `<div class="banner"><span><b>Mode démo</b> : clients, projets et factures fictifs. Rien n'est enregistré en ligne. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><a class="btn sm primary" href="app.html#inscription">Créer mon compte</a></div>` : S.settings.sample ? `<div class="banner"><span>Cet appareil contient encore des <b>données d'exemple</b>.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
   <div class="ph"><div><div class="eyebrow">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour${S.settings.owner ? ' ' + esc(S.settings.owner.split(' ')[0]) : ''}</h1></div>
   <div class="row"><button class="btn" onclick="App.editClient()">Nouveau client</button><button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
   <div class="kpis">${kpi('Projets en cours', active.length, `${S.projects.filter(p => p.status === 'termine').length} terminés`)}${kpi('À encaisser', fmt(toCollect), 'factures envoyées')}${kpi('En retard', fmt(late), `${lateN} facture${lateN > 1 ? 's' : ''}`, late ? 'bad' : '')}${kpi('Encaissé ce mois', fmt(month), new Date().toLocaleDateString('fr-FR', { month: 'long' }), 'ok')}</div>
@@ -852,8 +852,6 @@ const Cloud = {
   setStatus(s) { this.status = s; const el = $('#sync'); if (el) el.innerHTML = syncChip(); },
   async start() {
     if (!this.ready) return;
-    const { data } = await sb.auth.getSession(); user = data.session?.user || null;
-    sb.auth.onAuthStateChange((_e, session) => { const u = session?.user || null; if (u?.id !== user?.id) { user = u; if (user) this.firstSync(); else { this.setStatus('local'); render(); } } });
     if (user) await this.firstSync();
     addEventListener('online', () => this.sync()); addEventListener('offline', () => this.setStatus(this.status));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sync(); });
@@ -862,10 +860,12 @@ const Cloud = {
   async firstSync() {
     try {
       const { data, error } = await sb.from('workspaces').select('data,updated_at').eq('owner', user.id).maybeSingle(); if (error) throw error;
+      if (S.cloud.owner && S.cloud.owner !== user.id) { await DB.clear('files'); S = blankState(); }
       if (data?.data && !(S.cloud.owner === user.id && S.cloud.dirty)) { S = migrate(data.data); S.cloud.syncedAt = data.updated_at; S.cloud.dirty = false; }
       else if (!data?.data) { if (S.settings.sample) { await DB.clear('files'); S = blankState(); } S.cloud.dirty = true; }
       S.cloud.owner = user.id; await DB.put('kv', 'state', S); render();
       await loadProfile(); render();
+      if (!S.settings.onboarded) showAuth('onboarding');
       this.subscribe(); await this.sync();
     } catch (e) { console.warn(e); this.setStatus('error'); }
   },
@@ -991,14 +991,6 @@ async function loadPortal(first) {
   const b = $('#brand'); b.innerHTML = `${S.settings.logo ? `<img src="${S.settings.logo}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:#fff;padding:3px">` : '<span class="logo">' + b.querySelector('.logo').innerHTML + '</span>'}<span>${esc(S.settings.name)}<small>Espace projet</small></span>`;
   if (first || !document.activeElement || !['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) render();
 }
-async function signIn(create) {
-  const email = val('a-email').trim(), password = val('a-pass');
-  if (!email || password.length < 8) return toast('Indiquez votre email et un mot de passe d\'au moins 8 caractères.');
-  const r = create ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: CFG.siteUrl || location.origin + location.pathname } }) : await sb.auth.signInWithPassword({ email, password });
-  if (r.error) return toast(r.error.message.includes('Invalid login') ? 'Email ou mot de passe incorrect.' : r.error.message);
-  if (create && !r.data.session) return toast('Compte créé. Confirmez votre adresse via l\'email reçu, puis connectez-vous.');
-  toast('Connecté. Synchronisation en cours…');
-}
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
   profile = data || { plan: 'decouverte', is_admin: false };
@@ -1027,18 +1019,23 @@ async function savePlan(uid_) {
   if (error) return toast('Échec : ' + error.message);
   toast(`Offre ${PLANS[plan].name} enregistrée`); adminUsers = null; if (uid_ === user.id) await loadProfile(); render();
 }
-async function signOut() { await sb.auth.signOut(); user = null; profile = null; adminUsers = null; Cloud.setStatus('local'); render(); toast('Déconnecté. Vos données restent sur cet appareil.'); }
+async function signOut() {
+  if (navigator.onLine && S.cloud.dirty) await Cloud.sync();
+  await sb.auth.signOut().catch(() => {});
+  // Rien ne reste sur l'appareil après la déconnexion (appareil partagé)
+  await DB.clear('kv').catch(() => {}); await DB.clear('files').catch(() => {});
+  try { localStorage.removeItem('valideo-view'); } catch (e) {}
+  location.replace('app.html');
+}
 const accountCard = () => {
   if (!Cloud.ready) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">La connexion à Supabase n'est pas configurée (fichier config.js). L'outil fonctionne en local sur cet appareil.</p></section>`;
-  if (!user) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">Connectez-vous pour retrouver vos données sur tous vos appareils et donner à chaque client un lien vers son espace.</p>
-    <div class="form"><label class="field"><span>Email</span><input id="a-email" type="email" autocomplete="username"></label><label class="field"><span>Mot de passe</span><input id="a-pass" type="password" autocomplete="current-password"></label></div>
-    <div class="row"><button class="btn primary" onclick="App.signIn(false)">Se connecter</button><button class="btn" onclick="App.signIn(true)">Créer mon compte</button></div></section>`;
+  if (!user) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">Vous n'êtes pas connecté.</p><button class="btn primary" style="align-self:flex-start" onclick="App.showAuth('login')">Se connecter</button></section>`;
   return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><div class="approve"><div><b>Offre ${esc(myPlan().name)}${profile?.is_admin ? ' · Administrateur' : ''}</b><div class="hint">${profile?.is_admin ? 'Aucune limite.' : `${myPlan().projects === Infinity ? 'Projets illimités' : myPlan().projects + ' projets en cours'} · ${myPlan().clients === Infinity ? 'clients illimités' : myPlan().clients + ' clients'}${profile?.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`}</div></div>${profile?.is_admin ? `<button class="btn sm" onclick="App.go('admin')">Administration</button>` : `<a class="btn sm" href="./#offres">Voir les offres</a>`}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
     <div class="row"><button class="btn" onclick="App.syncNow()">Synchroniser maintenant</button><button class="btn ghost" onclick="App.signOut()">Se déconnecter</button></div></section>`;
 };
 function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Lien copié'), () => toast(t)); }
 function sendPortal(cid) { const c = client(cid), l = portalLink(cid); openSend('Envoyer l\'espace client', [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }], `Votre espace projet · ${S.settings.name}`, `Bonjour ${c.name || ''},\n\nSuivez vos projets, validez les étapes et commentez les vidéos ici :\n${l}\n\n${S.settings.owner}`); }
-function migrate(s) { const b = blankState(); s.settings = { retentionDays: 7, ...b.settings, ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
+function migrate(s) { const b = blankState(); s.settings = { retentionDays: 7, ...b.settings, onboarded: !!(s.settings?.name || s.settings?.owner), ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
 function sampleFrame() {
   return new Promise(res => {
     const cv = document.createElement('canvas'); cv.width = 1280; cv.height = 720; const g = cv.getContext('2d');
@@ -1087,7 +1084,7 @@ async function seed() {
 
 /* Liens directs : #/factures… ex. #/invoices, #/project/0, #/as/0/media/0 (index ou identifiant) */
 function applyHash() {
-  const parts = decodeURIComponent(location.hash).replace(/^#\/?/, '').split('/').filter(Boolean); if (!parts.length) return false;
+  const parts = decodeURIComponent(location.hash).replace(/^#\/?/, '').split('/').filter(Boolean); if (!parts.length || /inscription|access_token|type=|error/.test(parts[0])) return false;
   const pick = (list, v) => /^\d+$/.test(v) ? list[+v]?.id : v;
   if (parts[0] === 'as') { const cid = pick(S.clients, parts[1]); view = client(cid) ? { as: 'client', clientId: cid } : { as: 'me' }; parts.splice(0, 2); }
   else if (parts[0] !== 'me') view = { as: 'me' }; else parts.shift();
@@ -1096,19 +1093,138 @@ function applyHash() {
   route = { page, id: parts[1] ? pick(lists[page] || [], parts[1]) : (page === 'client' && !isOwner() ? view.clientId : null) };
   return true;
 }
-async function init() {
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-  if (!DEMO) Cloud.init();
-  PORTAL_TOKEN = new URLSearchParams(location.search).get('portail');
-  if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
-  if (PORTAL_TOKEN) {
-    MODE = 'portal'; document.body.classList.add('portal');
-    if (!Cloud.ready) { $('#main').innerHTML = '<div class="loading">Espace client indisponible pour le moment.</div>'; return; }
-    await loadPortal(true);
-    setInterval(() => loadPortal(false), 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadPortal(false); });
-    return;
+/* ---------------- Accès : connexion, inscription, Google, mot de passe ---------------- */
+let authMode = 'login', authEmail = '', googleOn = false, appStarted = false, authBusy = false;
+const GOOGLE_SVG = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+const CURRENCIES = [['€', 'Euro (€)'], ['FCFA', 'Franc CFA (FCFA)'], ['$', 'Dollar ($)'], ['MAD', 'Dirham marocain (MAD)'], ['CA$', 'Dollar canadien (CA$)'], ['CHF', 'Franc suisse (CHF)'], ['GNF', 'Franc guinéen (GNF)'], ['FC', 'Franc congolais (FC)'], ['DA', 'Dinar algérien (DA)'], ['DT', 'Dinar tunisien (DT)']];
+const JOBS = ['Monteur vidéo freelance', 'Motion designer', 'Vidéaste / réalisateur', 'Vidéaste de mariage', 'Monteur YouTube', 'Studio de post-production', 'Ingé son / mixeur', 'Autre'];
+async function detectProviders() {
+  try { const j = await (await fetch(CFG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: CFG.supabaseAnonKey } })).json(); googleOn = !!j.external?.google; } catch (e) {}
+}
+function showAuth(mode) {
+  if (mode) authMode = mode;
+  document.querySelector('.app').hidden = true; $('#auth').hidden = false;
+  $('#auth-card').innerHTML = authHTML();
+  setTimeout(() => $('#auth-card input:not([type=checkbox])')?.focus(), 40);
+}
+function hideAuth() { $('#auth').hidden = true; document.querySelector('.app').hidden = false; }
+const authSteps = n => `<ol class="auth-steps" aria-label="Étapes de l'inscription">${['Compte', 'Confirmation', 'Profil'].map((l, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"><span>${i + 1 < n ? '✓' : i + 1}</span>${l}</li>`).join('')}</ol>`;
+const gBtn = label => googleOn ? `<button type="button" class="btn g-btn" onclick="App.google()">${GOOGLE_SVG}${label}</button><div class="or"><span>ou avec ton email</span></div>` : '';
+function authHTML() {
+  const back = `<button type="button" class="link" onclick="App.authMode('login')">Retour à la connexion</button>`;
+  switch (authMode) {
+    case 'signup': return `${authSteps(1)}<h2>Créer ton compte</h2><p class="hint">Offre Découverte gratuite, sans carte bancaire.</p>${gBtn('S’inscrire avec Google')}
+      <form class="auth-form" onsubmit="event.preventDefault();App.doSignup()">
+        <label class="field"><span>Prénom et nom</span><input id="a-name" autocomplete="name" required placeholder="Awa Diallo"></label>
+        <label class="field"><span>Nom de ton activité <em>(facultatif)</em></span><input id="a-biz" autocomplete="organization" placeholder="Studio Lumière"></label>
+        <label class="field"><span>Email</span><input id="a-email" type="email" autocomplete="email" required value="${esc(authEmail)}"></label>
+        <label class="field"><span>Mot de passe</span><input id="a-pass" type="password" autocomplete="new-password" required minlength="8" oninput="App.pwMeter(this.value)"><span class="pw"><i id="pw-bar"></i></span><small id="pw-txt" class="hint">8 caractères minimum.</small></label>
+        <label class="check"><input id="a-terms" type="checkbox" required> J’accepte que mes données soient traitées pour faire fonctionner Validéo.</label>
+        <button class="btn primary" type="submit" id="a-submit">Créer mon compte</button>
+      </form><p class="switch">Déjà inscrit ? <button type="button" class="link" onclick="App.authMode('login')">Se connecter</button></p>`;
+    case 'check': return `${authSteps(2)}<div class="auth-icon">✉</div><h2>Vérifie ta boîte mail</h2><p>Nous avons envoyé un lien de confirmation à <b>${esc(authEmail)}</b>. Clique dessus pour activer ton compte : tu arriveras directement dans Validéo.</p>
+      <p class="hint">Rien reçu après 2 minutes ? Regarde dans les courriers indésirables, ou renvoie l’email.</p>
+      <div class="auth-form"><button class="btn" type="button" onclick="App.resend()">Renvoyer l’email</button><button class="btn primary" type="button" onclick="App.authMode('login')">J’ai confirmé, me connecter</button></div>`;
+    case 'forgot': return `<h2>Mot de passe oublié</h2><p class="hint">Indique ton email : tu recevras un lien pour choisir un nouveau mot de passe.</p>
+      <form class="auth-form" onsubmit="event.preventDefault();App.sendReset()"><label class="field"><span>Email</span><input id="a-email" type="email" autocomplete="email" required value="${esc(authEmail)}"></label><button class="btn primary" type="submit" id="a-submit">Envoyer le lien</button></form><p class="switch">${back}</p>`;
+    case 'reset': return `<h2>Nouveau mot de passe</h2><p class="hint">Choisis un nouveau mot de passe pour ${esc(user?.email || 'ton compte')}.</p>
+      <form class="auth-form" onsubmit="event.preventDefault();App.doReset()"><label class="field"><span>Nouveau mot de passe</span><input id="a-pass" type="password" autocomplete="new-password" required minlength="8" oninput="App.pwMeter(this.value)"><span class="pw"><i id="pw-bar"></i></span><small id="pw-txt" class="hint">8 caractères minimum.</small></label>
+      <label class="field"><span>Confirmer</span><input id="a-pass2" type="password" autocomplete="new-password" required minlength="8"></label><button class="btn primary" type="submit" id="a-submit">Enregistrer</button></form>`;
+    case 'onboarding': {
+      const m = user?.user_metadata || {}, st = S?.settings || {}, nm = st.owner || m.full_name || m.name || '';
+      return `${authSteps(3)}<h2>Bienvenue${nm ? ', ' + esc(nm.split(' ')[0]) : ''} !</h2><p class="hint">Quelques infos pour préparer tes factures et tes messages. Tu pourras tout modifier dans Identité &amp; réglages.</p>
+      <form class="auth-form" onsubmit="event.preventDefault();App.saveOnboarding()">
+        <label class="field"><span>Ton nom</span><input id="o-name" required value="${esc(nm)}" autocomplete="name"></label>
+        <label class="field"><span>Nom de ton activité</span><input id="o-biz" value="${esc(st.name || m.business || '')}" placeholder="Ex. : Studio Lumière" autocomplete="organization"></label>
+        <label class="field"><span>Ton métier</span><select id="o-job">${JOBS.map(j => `<option ${st.job === j ? 'selected' : ''}>${j}</option>`).join('')}</select></label>
+        <div class="auth-2"><label class="field"><span>Devise</span><select id="o-cur">${CURRENCIES.map(([v, l]) => `<option value="${v}" ${(st.currency || '€') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="field"><span>WhatsApp</span><input id="o-phone" type="tel" value="${esc(st.phone || '')}" placeholder="+221 77 123 45 67" autocomplete="tel"></label></div>
+        <button class="btn primary" type="submit">Commencer avec Validéo</button>
+      </form>`;
+    }
+    case 'offline': return `<div class="auth-icon">⚡</div><h2>Connexion internet requise</h2><p class="hint">Connecte-toi une première fois avec internet. Ensuite, Validéo fonctionnera aussi hors ligne sur cet appareil.</p><div class="auth-form"><button class="btn primary" type="button" onclick="location.reload()">Réessayer</button></div>`;
+    default: return `<h2>Connexion</h2><p class="hint">Content de te revoir.</p>${gBtn('Continuer avec Google')}
+      <form class="auth-form" onsubmit="event.preventDefault();App.doLogin()">
+        <label class="field"><span>Email</span><input id="a-email" type="email" autocomplete="email" required value="${esc(authEmail)}"></label>
+        <label class="field"><span class="lbl-row">Mot de passe <button type="button" class="link" onclick="App.authMode('forgot')">Mot de passe oublié ?</button></span><input id="a-pass" type="password" autocomplete="current-password" required></label>
+        <button class="btn primary" type="submit" id="a-submit">Se connecter</button>
+      </form><p class="switch">Pas encore de compte ? <button type="button" class="link" onclick="App.authMode('signup')">Créer un compte gratuit</button></p>`;
   }
+}
+function setAuthMode(m) { authEmail = val('a-email') || authEmail; showAuth(m); }
+function busy(on, label) { authBusy = on; const b = $('#a-submit'); if (b) { b.disabled = on; if (label) b.textContent = label; } }
+function authError(e) {
+  const m = (e?.message || '').toLowerCase();
+  if (m.includes('invalid login')) return 'Email ou mot de passe incorrect.';
+  if (m.includes('email not confirmed')) { setTimeout(() => showAuth('check'), 0); return 'Confirme d’abord ton adresse email (lien reçu par email).'; }
+  if (m.includes('already registered') || m.includes('already been registered')) return 'Un compte existe déjà avec cet email. Connecte-toi ou utilise « Mot de passe oublié ».';
+  if (m.includes('rate limit') || m.includes('too many')) return 'Trop de tentatives. Patiente quelques minutes puis réessaie.';
+  if (m.includes('password')) return 'Mot de passe trop faible : 8 caractères minimum.';
+  if (m.includes('provider is not enabled')) return 'La connexion Google n’est pas encore activée.';
+  if (m.includes('fetch') || m.includes('network')) return 'Connexion internet indisponible. Réessaie quand tu es en ligne.';
+  return e?.message || 'Une erreur est survenue.';
+}
+function pwMeter(v) {
+  const score = [v.length >= 8, v.length >= 12, /[A-Z]/.test(v) && /[a-z]/.test(v), /\d/.test(v), /[^A-Za-z0-9]/.test(v)].filter(Boolean).length;
+  const lv = !v ? 0 : score <= 1 ? 1 : score <= 3 ? 2 : 3, bar = $('#pw-bar'), txt = $('#pw-txt');
+  if (bar) { bar.style.width = ['0%', '33%', '66%', '100%'][lv]; bar.className = ['', 'weak', 'mid', 'strong'][lv]; }
+  if (txt) txt.textContent = ['8 caractères minimum.', 'Faible : allonge-le ou ajoute des chiffres.', 'Correct.', 'Solide.'][lv];
+}
+const backUrl = () => CFG.siteUrl || location.href.split(/[?#]/)[0];
+async function doLogin() {
+  if (authBusy) return; authEmail = val('a-email').trim(); busy(true, 'Connexion…');
+  const { error } = await sb.auth.signInWithPassword({ email: authEmail, password: val('a-pass') });
+  busy(false, 'Se connecter'); if (error) toast(authError(error));
+}
+async function doSignup() {
+  if (authBusy) return;
+  authEmail = val('a-email').trim(); const password = val('a-pass');
+  if (password.length < 8) return toast('Choisis un mot de passe d’au moins 8 caractères.');
+  if (!$('#a-terms').checked) return toast('Coche la case pour continuer.');
+  busy(true, 'Création du compte…');
+  const { data, error } = await sb.auth.signUp({ email: authEmail, password, options: { emailRedirectTo: backUrl(), data: { full_name: val('a-name').trim(), business: val('a-biz').trim() } } });
+  busy(false, 'Créer mon compte');
+  if (error) return toast(authError(error));
+  if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) return toast('Un compte existe déjà avec cet email. Connecte-toi ou utilise « Mot de passe oublié ».');
+  if (!data.session) showAuth('check');
+}
+async function resend() {
+  const { error } = await sb.auth.resend({ type: 'signup', email: authEmail, options: { emailRedirectTo: backUrl() } });
+  toast(error ? authError(error) : 'Email renvoyé à ' + authEmail);
+}
+async function google() {
+  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: backUrl() } });
+  if (error) toast(authError(error));
+}
+async function sendReset() {
+  if (authBusy) return; authEmail = val('a-email').trim(); busy(true, 'Envoi…');
+  const { error } = await sb.auth.resetPasswordForEmail(authEmail, { redirectTo: backUrl() });
+  busy(false, 'Envoyer le lien');
+  if (error) return toast(authError(error));
+  toast('Si un compte existe pour ' + authEmail + ', un lien vient de lui être envoyé.'); showAuth('login');
+}
+async function doReset() {
+  const p1 = val('a-pass'), p2 = val('a-pass2');
+  if (p1.length < 8) return toast('8 caractères minimum.');
+  if (p1 !== p2) return toast('Les deux mots de passe sont différents.');
+  busy(true, 'Enregistrement…');
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  busy(false, 'Enregistrer');
+  if (error) return toast(authError(error));
+  toast('Mot de passe modifié.'); history.replaceState(null, '', location.pathname);
+  if (appStarted) hideAuth(); else startApp();
+}
+function saveOnboarding() {
+  const st = S.settings, name = val('o-name').trim();
+  if (!name) return toast('Indique ton nom.');
+  Object.assign(st, { owner: name, name: val('o-biz').trim() || name, job: val('o-job'), currency: val('o-cur'), phone: val('o-phone').trim() || st.phone, email: st.email || user?.email || '', onboarded: true });
+  if (!st.stampTop || st.stampTop === 'MON STUDIO') st.stampTop = st.name.toUpperCase();
+  if (!st.stampBottom || st.stampBottom === 'MONTAGE VIDÉO') st.stampBottom = st.job.toUpperCase();
+  save(); hideAuth(); route = { page: 'dashboard' }; render(); toast('Ton espace est prêt.');
+}
+async function startApp() {
+  if (appStarted) return; appStarted = true; hideAuth();
+  if (/access_token|type=|error/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
   await DB.open();
   let st = await DB.get('kv', 'state').catch(() => null);
   if (!st) { st = DEMO ? await seed() : blankState(); await DB.put('kv', 'state', st).catch(() => {}); }
@@ -1119,10 +1235,42 @@ async function init() {
   render(); purgeExpired(); setInterval(purgeExpired, 36e5);
   Cloud.start();
 }
+
+async function init() {
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!DEMO) Cloud.init();
+  PORTAL_TOKEN = new URLSearchParams(location.search).get('portail');
+  if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
+  if (PORTAL_TOKEN) {
+    MODE = 'portal'; document.body.classList.add('portal'); document.querySelector('.app').hidden = false;
+    if (!Cloud.ready) { $('#main').innerHTML = '<div class="loading">Espace client indisponible pour le moment.</div>'; return; }
+    await loadPortal(true);
+    setInterval(() => loadPortal(false), 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadPortal(false); });
+    return;
+  }
+  if (!Cloud.ready) return startApp(); // démo, captures ou configuration absente
+  detectProviders().then(() => { if (!$('#auth').hidden && ['login', 'signup'].includes(authMode)) showAuth(); });
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') { user = session?.user || user; return showAuth('reset'); }
+    const u = session?.user || null;
+    if (u && u.id !== user?.id) { user = u; if (!appStarted) startApp(); else Cloud.firstSync(); }
+  });
+  const { data } = await sb.auth.getSession().catch(() => ({ data: {} }));
+  user = data?.session?.user || null;
+  if (!user && !navigator.onLine) {
+    // Hors ligne : on reprend la dernière session enregistrée sur l'appareil
+    try { const raw = localStorage.getItem('sb-' + new URL(CFG.supabaseUrl).hostname.split('.')[0] + '-auth-token'); user = raw ? JSON.parse(raw).user : null; } catch (e) {}
+    if (!user) return showAuth('offline');
+  }
+  if (location.hash.includes('type=recovery')) return; // l'événement PASSWORD_RECOVERY affichera le formulaire
+  if (user) return startApp();
+  showAuth(location.hash.includes('inscription') ? 'signup' : 'login');
+}
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signIn, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
