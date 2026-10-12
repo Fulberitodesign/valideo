@@ -122,10 +122,20 @@ const PLANS = {
 let profile = null, adminUsers = null;
 const planExpired = () => !profile?.is_admin && profile?.plan !== 'decouverte' && profile?.plan_until && profile.plan_until < today();
 const myPlan = () => planExpired() ? PLANS.decouverte : (PLANS[profile?.plan] || PLANS.decouverte);
-/* Prix en francs CFA, identiques à ceux de la fonction serveur moneroo-checkout */
+/* Prix en francs CFA, identiques à ceux de la fonction serveur feexpay-pay */
 const PRICE_XOF = { solo: { month: 6600, year: 65600 }, pro: { month: 12500, year: 124600 }, studio: { month: 26200, year: 262400 } };
 const xof = n => n.toLocaleString('fr-FR') + ' FCFA';
-let payChoice = { plan: 'pro', period: 'month', method: 'mobile' };
+let payChoice = { plan: 'pro', period: 'month', method: 'mobile', country: 'BENIN', network: 'MTN', phone: '', otp: '', card: 'VISA' };
+/* Pays et opérateurs Mobile Money pris en charge par FeexPay */
+const PAY_COUNTRIES = {
+  BENIN: { name: 'Bénin', code: '229', nets: { MTN: 'MTN MoMo', MOOV: 'Moov Money', CELTIIS: 'Celtiis Cash' } },
+  COTE_D_IVOIRE: { name: 'Côte d’Ivoire', code: '225', nets: { MTN: 'MTN MoMo', MOOV: 'Moov Money', ORANGE: 'Orange Money', WAVE: 'Wave' } },
+  TOGO: { name: 'Togo', code: '228', nets: { TOGOCOM: 'T-Money', MOOV: 'Flooz (Moov)' } },
+  SENEGAL: { name: 'Sénégal', code: '221', nets: { ORANGE: 'Orange Money', FREE: 'Free Money' } },
+  BURKINA_FASO: { name: 'Burkina Faso', code: '226', nets: { MOOV: 'Moov Money', ORANGE: 'Orange Money' } },
+  CONGO_BRAZZAVILLE: { name: 'Congo-Brazzaville', code: '242', nets: { MTN: 'MTN MoMo' } }
+};
+let payWait = null;
 const PLAN_FEATS = {
   decouverte: ['2 projets en cours', '2 clients', 'Révisions au timecode et sur image', 'Espace client et invitations', 'Facture générée automatiquement'],
   solo: ['10 projets en cours', 'Clients illimités', '6 modèles de facture', 'Relances et comptabilité', 'Export CSV pour le comptable'],
@@ -148,48 +158,88 @@ function pPlan() {
       ${isCur ? (paid ? `<button class="btn" onclick="App.upgradeModal('${k}')">Prolonger</button>` : '<span class="pill ok" style="align-self:flex-start">Offre actuelle</span>') : paid ? `<button class="btn ${k === 'pro' ? 'primary' : ''}" onclick="App.upgradeModal('${k}')">Choisir ${p.name}</button>` : '<span class="muted small">Retour automatique à l’échéance d’une offre payante</span>'}</div>`; };
   const PST = { success: ['ok', 'Payé'], pending: ['warn', 'En attente'], failed: ['bad', 'Échoué'], cancelled: ['', 'Annulé'], mismatch: ['bad', 'Incohérent'] };
   return `<div class="ph"><div><h1>Mon offre</h1><div class="meta">${admin ? 'Compte administrateur : aucune limite.' : `Offre <b>${cur.name}</b>${profile?.plan_until && curKey !== 'decouverte' ? ' · valable jusqu’au ' + fdate(profile.plan_until) : ''}${planExpired() ? ' · ton offre précédente a expiré' : ''}`}</div></div>${admin ? '' : `<button class="btn primary" onclick="App.upgradeModal('${curKey === 'decouverte' ? 'pro' : curKey}')">${curKey === 'decouverte' ? 'Passer à une offre supérieure' : 'Prolonger mon offre'}</button>`}</div>
-    <div class="kpis">${gauge('projects', 'Projets en cours')}${gauge('clients', 'Clients')}${kpi('Moyens de paiement', 'Mobile Money · Carte', 'MTN, Moov, Visa, Mastercard')}</div>
+    <div class="kpis">${gauge('projects', 'Projets en cours')}${gauge('clients', 'Clients')}${kpi('Moyens de paiement', 'Mobile Money · Carte', 'MTN, Moov, Celtiis, Orange, Wave, Visa…')}</div>
     <div class="plan-grid">${['decouverte', 'solo', 'pro', 'studio'].map(card).join('')}</div>
     <section class="card" style="margin-top:18px"><h2>Mes paiements</h2>${!myPays ? '<p class="hint">Chargement…</p>' : myPays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Offre</th><th>Moyen</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>${myPays.map(p => `<tr><td>${ftime(p.created_at)}</td><td>${esc(PLANS[p.plan]?.name || p.plan)} · ${p.period === 'year' ? '1 an' : '1 mois'}</td><td>${p.method === 'card' ? 'Carte bancaire' : p.method === 'mobile' ? 'Mobile Money' : '—'}</td><td class="num">${xof(p.amount)}</td><td>${pill(...(PST[p.status] || ['', p.status]))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement pour l’instant.</p>'}
-    <p class="hint">Paiement sécurisé par Moneroo. Validéo ne voit jamais tes données de carte. Une question ? <a href="mailto:contactfulbert1@gmail.com">contactfulbert1@gmail.com</a></p></section>`;
+    <p class="hint">Paiement sécurisé par FeexPay. Validéo ne voit jamais tes données de carte ni ton code Mobile Money. Une question ? <a href="mailto:contactfulbert1@gmail.com">contactfulbert1@gmail.com</a></p></section>`;
 }
 function upgradeModal(plan) {
   if (!user || !Cloud.ready) return toast('Connecte-toi à ton compte pour changer d\'offre.');
   if (plan) payChoice.plan = plan;
+  payWait = null;
   const c = payChoice, cards = ['solo', 'pro', 'studio'].map(k => { const p = PLANS[k];
     return `<button type="button" class="pay-plan ${c.plan === k ? 'on' : ''}" onclick="App.payPick('plan','${k}')"><b>${p.name}</b><span class="mono">${p.price} € <small>/ mois</small></span><small class="muted">${p.projects === Infinity ? 'Projets illimités' : p.projects + ' projets en cours'}</small>${k === 'pro' ? '<i class="pay-tag">Le plus choisi</i>' : ''}</button>`; }).join('');
-  const amount = PRICE_XOF[c.plan][c.period];
+  const amount = PRICE_XOF[c.plan][c.period], ctry = PAY_COUNTRIES[c.country];
+  if (!ctry.nets[c.network]) c.network = Object.keys(ctry.nets)[0];
+  const mobile = c.method === 'mobile';
   openModal('Changer d\'offre', `<div class="pay-plans">${cards}</div>
     <div class="field"><span>Durée</span><div class="seg"><button type="button" class="${c.period === 'month' ? 'on' : ''}" onclick="App.payPick('period','month')">1 mois</button><button type="button" class="${c.period === 'year' ? 'on' : ''}" onclick="App.payPick('period','year')">1 an <em>2 mois offerts</em></button></div></div>
-    <div class="field"><span>Moyen de paiement</span><div class="seg"><button type="button" class="${c.method === 'mobile' ? 'on' : ''}" onclick="App.payPick('method','mobile')">Mobile Money <small>MTN · Moov</small></button><button type="button" class="${c.method === 'card' ? 'on' : ''}" onclick="App.payPick('method','card')">Carte bancaire</button></div></div>
+    <div class="field"><span>Moyen de paiement</span><div class="seg"><button type="button" class="${mobile ? 'on' : ''}" onclick="App.payPick('method','mobile')">Mobile Money</button><button type="button" class="${mobile ? '' : 'on'}" onclick="App.payPick('method','card')">Carte bancaire</button></div></div>
+    ${mobile ? `<div class="row2"><label class="field"><span>Pays</span><select onchange="App.payPick('country',this.value)">${Object.entries(PAY_COUNTRIES).map(([k, v]) => `<option value="${k}" ${k === c.country ? 'selected' : ''}>${v.name}</option>`).join('')}</select></label>
+      <label class="field"><span>Opérateur</span><select onchange="App.payPick('network',this.value)">${Object.entries(ctry.nets).map(([k, v]) => `<option value="${k}" ${k === c.network ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>`
+    : `<div class="field"><span>Carte</span><div class="seg"><button type="button" class="${c.card === 'VISA' ? 'on' : ''}" onclick="App.payPick('card','VISA')">Visa</button><button type="button" class="${c.card === 'MASTERCARD' ? 'on' : ''}" onclick="App.payPick('card','MASTERCARD')">Mastercard</button></div></div>`}
+    <label class="field"><span>${mobile ? 'Numéro Mobile Money' : 'Ton numéro de téléphone'}</span><div class="phone-in"><b class="mono">+${ctry.code}</b><input id="pay-phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="${mobile && c.country === 'BENIN' ? '01 97 00 00 00' : 'Numéro sans l’indicatif'}" value="${esc(c.phone)}" oninput="App.payPick('phone',this.value,true)"></div></label>
+    ${mobile && c.network === 'ORANGE' ? `<label class="field"><span>Code de paiement Orange Money <small class="muted">(code temporaire à générer dans ton menu Orange Money)</small></span><input type="text" inputmode="numeric" value="${esc(c.otp)}" oninput="App.payPick('otp',this.value,true)"></label>` : ''}
     <div class="sum"><div class="grand"><span>À payer</span><span class="mono">${xof(amount)}</span></div></div>
-    <p class="hint">Paiement sécurisé par Moneroo. Tu es redirigé vers leur page de paiement, puis ramené ici : ton offre s'active automatiquement dès la confirmation${profile?.plan_until && !planExpired() && profile.plan === c.plan ? `, et s'ajoute à la période en cours (jusqu'au ${fdate(profile.plan_until)})` : ''}.</p>`,
+    <p class="hint">${mobile ? 'Tu reçois une demande de paiement sur ton téléphone : valide-la avec ton code secret, sans quitter Validéo.' : 'Une page sécurisée de FeexPay s’ouvre pour saisir ta carte.'} Ton offre s'active automatiquement dès la confirmation${profile?.plan_until && !planExpired() && profile.plan === c.plan ? `, et s'ajoute à la période en cours (jusqu'au ${fdate(profile.plan_until)})` : ''}.</p>`,
     `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" id="pay-go" onclick="App.startPayment()">Payer ${xof(amount)}</button>`);
 }
-function payPick(k, v) { payChoice[k] = v; upgradeModal(); }
-async function startPayment() {
-  const b = $('#pay-go'); if (b) { b.disabled = true; b.textContent = 'Redirection vers le paiement…'; }
-  try {
-    const { data, error } = await sb.functions.invoke('moneroo-checkout', { body: payChoice });
-    if (error || !data?.checkout_url) {
-      let msg = data?.error; try { msg = msg || (await error?.context?.json())?.error; } catch (e) {}
-      throw new Error(msg || error?.message || 'Paiement indisponible');
-    }
-    location.href = data.checkout_url;
-  } catch (e) { const m = /no payment methods/i.test(e.message) ? (payChoice.method === 'card' ? 'le paiement par carte n’est pas encore activé. Choisis Mobile Money ou réessaie plus tard.' : 'le Mobile Money n’est pas encore activé. Choisis la carte bancaire ou réessaie plus tard.') : e.message; toast('Paiement impossible : ' + m); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
+function payPick(k, v, quiet) { payChoice[k] = v; if (!quiet) upgradeModal(); }
+async function payCall(body) {
+  const { data, error } = await sb.functions.invoke('feexpay-pay', { body });
+  if (error || data?.error) { let msg = data?.error; try { msg = msg || (await error?.context?.json())?.error; } catch (e) {} throw new Error(msg || error?.message || 'Paiement indisponible'); }
+  return data;
 }
-/* Retour depuis la page de paiement : on attend la confirmation du serveur */
+async function startPayment() {
+  const c = payChoice, b = $('#pay-go');
+  if (String(c.phone).replace(/\D/g, '').length < 8) { toast('Indique ton numéro de téléphone.'); return $('#pay-phone')?.focus(); }
+  if (b) { b.disabled = true; b.textContent = 'Envoi de la demande…'; }
+  try {
+    const d = await payCall({ action: 'start', ...c });
+    if (d.status === 'success') return payDone(d.plan);
+    payWaitScreen(d);
+  } catch (e) { toast('Paiement impossible : ' + e.message); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
+}
+/* Attente de la validation sur le téléphone (ou sur la page carte), sans quitter l'application */
+function payWaitScreen(d) {
+  const c = payChoice, mobile = c.method === 'mobile', net = mobile ? PAY_COUNTRIES[c.country].nets[c.network] : '';
+  const tip = !mobile ? '' : c.network === 'MTN' ? 'Si rien ne s’affiche, ouvre ton menu MoMo <b class="mono">*880#</b> pour approuver.' : c.network === 'MOOV' ? 'Si rien ne s’affiche, ouvre ton menu Moov Money <b class="mono">*855#</b> pour approuver.' : 'Garde ton téléphone à portée de main.';
+  openModal('Validation du paiement', `<div class="pay-wait"><div class="spin"></div>
+    <h3>${mobile ? `Valide le paiement sur ton téléphone` : 'Termine le paiement par carte'}</h3>
+    <p>${mobile ? `Une demande ${esc(net)} de <b>${xof(PRICE_XOF[c.plan][c.period])}</b> vient d’être envoyée au <b class="mono">+${PAY_COUNTRIES[c.country].code} ${esc(c.phone)}</b>. Saisis ton code secret pour l’accepter.` : 'Saisis ta carte sur la page sécurisée de FeexPay, puis reviens ici.'}</p>
+    ${d.url ? `<a class="btn primary" href="${esc(d.url)}" target="_blank" rel="noopener">Ouvrir la page de paiement</a>` : ''}
+    <p class="hint">${tip} Cette fenêtre se met à jour toute seule dès la confirmation.</p></div>`,
+    `<button class="btn" onclick="App.upgradeModal()">Modifier</button>`);
+  if (d.url) window.open(d.url, '_blank', 'noopener');
+  const me = payWait = { id: d.payment_id };
+  (async () => {
+    for (let i = 0; i < 75 && payWait === me; i++) {
+      await new Promise(res => setTimeout(res, i < 10 ? 3000 : 5000));
+      if (payWait !== me) return;
+      let r; try { r = await payCall({ action: 'check', payment_id: d.payment_id }); } catch (e) { continue; }
+      if (r.status === 'success') return payDone(r.plan);
+      if (['failed', 'cancelled', 'mismatch'].includes(r.status)) { payWait = null; myPays = null; upgradeModal(); return toast(r.reason ? 'Paiement refusé : ' + r.reason + '.' : 'Le paiement n\'a pas abouti. Aucun montant n\'a été prélevé : tu peux réessayer.'); }
+    }
+    if (payWait === me) { payWait = null; closeModal(); myPays = null; toast('Pas encore de confirmation. Si tu as validé, ton offre s\'activera automatiquement d\'ici quelques minutes.'); if (route.page === 'plan') render(); }
+  })();
+}
+async function payDone(plan) {
+  payWait = null; closeModal(); await loadProfile(); myPays = null;
+  route = { page: 'plan' }; history.replaceState(null, '', location.pathname + '#/plan'); render();
+  toast(`Merci ! Ton offre ${PLANS[plan]?.name || ''} est active.`);
+}
+/* Retour d'une page de paiement externe : on revérifie auprès du serveur */
 async function watchPayment(pid) {
   history.replaceState(null, '', location.pathname + '#/plan');
   route = { page: 'plan' }; myPays = null; render();
   toast('Paiement reçu, confirmation en cours…');
   for (let i = 0; i < 20; i++) {
-    const { data } = await sb.from('payments').select('status, plan').eq('id', pid).maybeSingle();
-    if (data?.status === 'success') { await loadProfile(); myPays = null; render(); return toast(`Merci ! Ton offre ${PLANS[data.plan].name} est active.`); }
-    if (data && ['failed', 'cancelled', 'mismatch'].includes(data.status)) return toast(data.status === 'cancelled' ? 'Paiement annulé : ton offre n\'a pas changé.' : 'Le paiement n\'a pas abouti. Aucun montant n\'a été validé : tu peux réessayer.');
+    let r = null; try { r = await payCall({ action: 'check', payment_id: pid }); } catch (e) {}
+    if (r?.status === 'success') return payDone(r.plan);
+    if (r && ['failed', 'cancelled', 'mismatch'].includes(r.status)) return toast('Le paiement n\'a pas abouti. Aucun montant n\'a été validé : tu peux réessayer.');
     await new Promise(res => setTimeout(res, 3000));
   }
-  toast('La confirmation prend plus de temps que prévu. Ton offre s\'activera automatiquement dès que Moneroo l\'aura confirmée.');
+  toast('La confirmation prend plus de temps que prévu. Ton offre s\'activera automatiquement dès la confirmation.');
 }
 function planAllows(kind) {
   if (!user || !profile || profile.is_admin) return true;
@@ -1261,7 +1311,7 @@ function pAdmin() {
   if (!adminPays) loadAdminPays();
   const mail = id => adminUsers.find(u => u.id === id)?.email || id.slice(0, 8);
   const PST = { success: ['ok', 'Payé'], pending: ['warn', 'En attente'], failed: ['bad', 'Échoué'], cancelled: ['', 'Annulé'], mismatch: ['bad', 'Montant incohérent'] };
-  const paysCard = `<section class="card" style="margin-top:16px"><div class="card-h"><h2>Paiements Moneroo</h2><span class="muted small">${(adminPays || []).filter(p => p.status === 'success').length} réussis sur les 30 derniers</span></div>${!adminPays ? '<p class="hint">Chargement…</p>' : adminPays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Utilisateur</th><th>Offre</th><th>Moyen</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>${adminPays.map(p => `<tr><td>${ftime(p.created_at)}</td><td>${esc(mail(p.user_id))}</td><td>${esc(PLANS[p.plan]?.name || p.plan)} · ${p.period === 'year' ? '1 an' : '1 mois'}</td><td>${p.method === 'card' ? 'Carte' : p.method === 'mobile' ? 'Mobile Money' : '—'}</td><td class="num">${xof(p.amount)}</td><td>${pill(...(PST[p.status] || ['', p.status]))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement pour l\'instant.</p>'}</section>`;
+  const paysCard = `<section class="card" style="margin-top:16px"><div class="card-h"><h2>Paiements des abonnements</h2><span class="muted small">${(adminPays || []).filter(p => p.status === 'success').length} réussis sur les 30 derniers</span></div>${!adminPays ? '<p class="hint">Chargement…</p>' : adminPays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Utilisateur</th><th>Offre</th><th>Moyen</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>${adminPays.map(p => `<tr><td>${ftime(p.created_at)}</td><td>${esc(mail(p.user_id))}</td><td>${esc(PLANS[p.plan]?.name || p.plan)} · ${p.period === 'year' ? '1 an' : '1 mois'}</td><td>${p.method === 'card' ? 'Carte' : p.method === 'mobile' ? 'Mobile Money' : '—'}</td><td class="num">${xof(p.amount)}</td><td>${pill(...(PST[p.status] || ['', p.status]))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement pour l\'instant.</p>'}</section>`;
   const t0 = today(), paying = adminUsers.filter(u => !u.is_admin && u.plan !== 'decouverte' && (!u.plan_until || u.plan_until >= t0));
   const mrr = paying.reduce((a, u) => a + PLANS[u.plan].price, 0);
   const count = k => adminUsers.filter(u => u.plan === k && !u.is_admin).length;
