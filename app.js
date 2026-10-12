@@ -294,9 +294,14 @@ async function purgeExpired() {
   if (changed) { save(); render(); }
 }
 function readDataURL(file) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); }); }
-async function readImage(file, max = 600) {
+async function readImage(file, max = 600, type = 'image/png') {
   const src = await readDataURL(file);
-  return new Promise((res, rej) => { const img = new Image(); img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); res(cv.toDataURL('image/png')); }; img.onerror = rej; img.src = src; });
+  return new Promise((res, rej) => { const img = new Image(); img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)); const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); res(cv.toDataURL(type, .85)); }; img.onerror = rej; img.src = src; });
+}
+/* Pastille d'un client : sa photo ou son logo s'il en a un, sinon ses initiales */
+function cAvatar(c, px) {
+  const st = px ? ` style="width:${px}px;height:${px}px;font-size:${Math.round(px * .35)}px"` : '';
+  return c?.logo ? `<span class="avatar has-img"${st}><img src="${c.logo}" alt=""></span>` : `<span class="avatar"${st}>${initials(cname(c))}</span>`;
 }
 function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
 
@@ -372,7 +377,7 @@ function alerts() {
   const out = [], t0 = today();
   S.invoices.forEach(i => {
     const c = client(i.clientId), t = totals(i), st = invStatus(i);
-    if (st === 'a_verifier') out.push({ lvl: 'warn', title: `Facture ${i.number} à vérifier`, sub: `${i.auto ? 'Générée à la fin du projet' : 'Brouillon'} · ${cname(c)} · ${fmt(t.ttc)}`, act: [['Vérifier', `App.go('invoice','${i.id}')`]] });
+    if (st === 'a_verifier') out.push({ lvl: 'warn', title: `Facture ${i.number} à vérifier`, sub: `${i.auto ? (i.kind === 'acompte' ? 'Acompte de démarrage' : 'Générée à la fin du projet') : 'Brouillon'} · ${cname(c)} · ${fmt(t.ttc)}`, act: [['Vérifier', `App.go('invoice','${i.id}')`]] });
     if (st === 'retard') { const d = diffDays(i.due, t0); const last = i.reminders?.length ? ` · relancée le ${fdate(i.reminders.at(-1))}` : ''; out.push({ lvl: 'bad', title: `${i.number} impayée depuis ${d} j`, sub: `${cname(c)} · reste ${fmt(t.due)}${last}`, act: [['Relancer', `App.remind('${i.id}')`]] }); }
     if ((st === 'envoyee' || st === 'partielle')) { const d = diffDays(t0, i.due); if (d <= 5) out.push({ lvl: 'info', title: `Échéance ${d === 0 ? "aujourd'hui" : 'dans ' + d + ' j'} · ${i.number}`, sub: `${cname(c)} · ${fmt(t.due)}`, act: [['Voir', `App.go('invoice','${i.id}')`]] }); }
   });
@@ -487,17 +492,17 @@ function actList(list, withProj) {
 /* ----- Clients ----- */
 function pClients() {
   const head = `<div class="ph"><div><h1>Clients</h1><div class="meta">${S.clients.length} client${S.clients.length > 1 ? 's' : ''}</div></div><div class="row">${viewToggle('clients')}<button class="btn primary" onclick="App.editClient()">Nouveau client</button></div></div>`;
-  if (S.clients.length && layout.clients === 'list') return head + `<section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Client</th><th>Contact</th><th class="num">En cours</th><th class="num">Total des projets</th><th class="num">Impayés</th></tr></thead><tbody>${S.clients.map(c => { const s = clientStats(c.id); return `<tr class="click" onclick="App.go('client','${c.id}')"><td><div class="row" style="flex-wrap:nowrap"><span class="avatar" style="width:32px;height:32px;font-size:12px">${initials(cname(c))}</span><b>${esc(cname(c))}</b></div></td><td class="muted small">${esc(c.company ? c.name : '')}${c.company ? '<br>' : ''}<span class="mono">${esc(c.email || c.phone || '')}</span></td><td class="num">${s.active}</td><td class="num">${fmt(s.value)}</td><td class="num" style="color:${s.due ? 'var(--bad)' : 'var(--ok)'}">${fmt(s.due)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+  if (S.clients.length && layout.clients === 'list') return head + `<section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Client</th><th>Contact</th><th class="num">En cours</th><th class="num">Total des projets</th><th class="num">Impayés</th></tr></thead><tbody>${S.clients.map(c => { const s = clientStats(c.id); return `<tr class="click" onclick="App.go('client','${c.id}')"><td><div class="row" style="flex-wrap:nowrap">${cAvatar(c, 32)}<b>${esc(cname(c))}</b></div></td><td class="muted small">${esc(c.company ? c.name : '')}${c.company ? '<br>' : ''}<span class="mono">${esc(c.email || c.phone || '')}</span></td><td class="num">${s.active}</td><td class="num">${fmt(s.value)}</td><td class="num" style="color:${s.due ? 'var(--bad)' : 'var(--ok)'}">${fmt(s.due)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
   return head + `
-  ${S.clients.length ? `<div class="cgrid">${S.clients.map(c => { const s = clientStats(c.id); return `<button class="ccard" onclick="App.go('client','${c.id}')"><div class="row"><span class="avatar">${initials(cname(c))}</span><div style="min-width:0"><div class="cn">${esc(cname(c))}</div><div class="muted small">${esc(c.company ? c.name : (c.email || c.phone || ''))}</div></div></div>
+  ${S.clients.length ? `<div class="cgrid">${S.clients.map(c => { const s = clientStats(c.id); return `<button class="ccard" onclick="App.go('client','${c.id}')"><div class="row">${cAvatar(c)}<div style="min-width:0"><div class="cn">${esc(cname(c))}</div><div class="muted small">${esc(c.company ? c.name : (c.email || c.phone || ''))}</div></div></div>
   <div class="cl"><span class="muted">Projets en cours</span><b class="mono">${s.active}</b></div><div class="cl"><span class="muted">Total des projets</span><b class="mono">${fmt(s.value)}</b></div><div class="cl"><span class="muted">Impayés</span><b class="mono" style="color:${s.due ? 'var(--bad)' : 'var(--ok)'}">${fmt(s.due)}</b></div></button>`; }).join('')}</div>` : `<p class="empty">Ajoutez votre premier client pour lui créer un tableau de bord.</p>`}`;
 }
 function pClient(id) {
   const c = client(id); if (!c) return nf(); const own = isOwner(); const s = clientStats(id);
   const invs = S.invoices.filter(i => i.clientId === id && (own || isSent(i))).sort((a, b) => b.date.localeCompare(a.date));
   return `${own ? `<div class="crumbs"><a onclick="App.go('clients')">Clients</a> /</div>` : ''}
-  <div class="ph"><div class="row" style="gap:14px"><span class="avatar" style="width:52px;height:52px;font-size:18px">${initials(cname(c))}</span><div><h1>${own ? esc(cname(c)) : 'Bonjour ' + esc((c.name || '').split(' ')[0])}</h1><div class="meta">${own ? `${c.company ? esc(c.name) + ' · ' : ''}<span class="mono small">${esc(c.email || '')}</span> <span class="mono small">${esc(c.phone || '')}</span>` : `Vos projets avec ${esc(S.settings.name)}`}</div></div></div>
-  ${own ? `<div class="row"><button class="btn" onclick="App.editClient('${c.id}')">Modifier</button><button class="btn" onclick="App.editInvoice(null,{clientId:'${c.id}'})">Nouvelle facture</button><button class="btn" onclick="App.groupInvoice('${c.id}')">Facture groupée</button><button class="btn primary" onclick="App.editProject(null,'${c.id}')">Nouveau projet</button></div>` : ''}</div>
+  <div class="ph"><div class="row" style="gap:14px">${cAvatar(c, 52)}<div><h1>${own ? esc(cname(c)) : 'Bonjour ' + esc((c.name || '').split(' ')[0])}</h1><div class="meta">${own ? `${c.company ? esc(c.name) + ' · ' : ''}<span class="mono small">${esc(c.email || '')}</span> <span class="mono small">${esc(c.phone || '')}</span>` : `Vos projets avec ${esc(S.settings.name)}`}</div></div></div>
+  ${own ? `<div class="row"><button class="btn" onclick="App.editClient('${c.id}')">Modifier</button><button class="btn" onclick="App.editInvoice(null,{clientId:'${c.id}',free:true})">Facture sans projet</button><button class="btn" onclick="App.groupInvoice('${c.id}')">Facture groupée</button><button class="btn primary" onclick="App.editProject(null,'${c.id}')">Nouveau projet</button></div>` : ''}</div>
   <div class="kpis">${kpi('Projets', s.ps.length, `${s.active} en cours · ${s.done} terminé${s.done > 1 ? 's' : ''}`)}${kpi('Montant des projets', fmt(s.value), 'hors taxes')}${kpi('Payé', fmt(s.paid), `sur ${fmt(s.billed)} facturés`, 'ok')}${kpi('Impayés', fmt(s.due), s.late ? `dont ${fmt(s.late)} en retard` : 'aucun retard', s.late ? 'bad' : (s.due ? 'warn' : ''))}</div>
   <div class="grid2"><section class="card"><h2>Projets</h2>${s.ps.length ? `<div class="plist">${s.ps.map(p => projRow(p, false)).join('')}</div>` : '<p class="empty">Aucun projet.</p>'}</section>
   <section class="card"><h2>Factures</h2>${invs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Échéance</th><th class="num">Montant</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>${invs.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture.</p>'}</section></div>
@@ -538,7 +543,7 @@ function pProject(id) {
       <section class="card"><div class="card-h"><h2>Équipe et invitations</h2>${own ? `<div class="row"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}')">Liens d'invitation</button><button class="btn sm" onclick="App.editCollab('${p.id}')">Ajouter</button></div>` : ''}</div>
         <div class="people">${(own ? ensurePeople(p) : (p.people || [])).map(x => `<div class="person"><div style="min-width:0"><b>${esc(x.name)}</b> ${rolePill(x)} <span class="muted small">${esc(x.title || '')}</span><div class="mono small muted">${esc(x.email || '')} ${esc(x.phone || '')}</div></div>${own ? `<div class="row" style="gap:2px"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}','${x.id}')">Inviter</button>${x.main ? '' : `<button class="icon-btn" aria-label="Retirer ${esc(x.name)}" onclick="App.delCollab('${p.id}','${x.id}')">×</button>`}</div>` : ''}</div>`).join('')}</div>
         ${own ? '<p class="hint">Chaque personne reçoit son propre lien, sans inscription. <b>Client</b> : valide les étapes et les versions. <b>Équipe</b> : commente et marque les corrections, sans voir les montants.</p>' : ''}</section>
-      ${canMoney() ? '' : '<!--'}      <section class="card"><div class="card-h"><h2>Facturation</h2>${own ? `<div class="row">${hasFinal ? '' : `<button class="btn sm ghost" onclick="App.depositInvoice('${p.id}')">Acompte</button><button class="btn sm" onclick="App.finalInvoice('${p.id}')">Facturer maintenant</button>`}</div>` : ''}</div>
+      ${canMoney() ? '' : '<!--'}      <section class="card"><div class="card-h"><h2>Facturation</h2>${own ? `<div class="row">${hasFinal ? '' : `<button class="btn sm ghost" onclick="App.depositInvoice('${p.id}')">Acompte…</button><button class="btn sm" onclick="App.finalInvoice('${p.id}')">Facturer maintenant</button>`}</div>` : ''}</div>
         ${invs.length ? `<div class="mlist">${invs.map(i => `<button class="mrow" onclick="App.go('invoice','${i.id}')"><span class="mono">${i.number}</span><span class="mname muted">${i.kind === 'acompte' ? 'Acompte' : i.kind === 'groupee' ? `Facture groupée · ${invProjects(i).length} projets` : i.kind === 'final' ? 'Facture finale' : 'Facture'}</span><span class="mono small">${fmt(totals(i).ttc)}</span>${invPill(i)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'La facture finale sera générée automatiquement quand toutes les étapes seront validées.' : 'Aucune facture pour ce projet.'}</p>`}</section>
       ${canMoney() ? '' : '-->'}<section class="card"><h2>Historique</h2>${actList(S.activity.filter(a => a.pid === p.id).slice(0, 10), false)}</section>
     </div>
@@ -599,7 +604,7 @@ function pInvoices() {
   const list = S.invoices.filter(i => { const st = invStatus(i); return invFilter === 'all' || st === invFilter || (invFilter === 'envoyee' && st === 'partielle'); }).sort((a, b) => b.number.localeCompare(a.number));
   const count = k => S.invoices.filter(i => invStatus(i) === k).length;
   const tab = (k, l) => `<button class="${invFilter === k ? 'on' : ''}" onclick="App.setFilter('inv','${k}')">${l}${k !== 'all' && count(k) ? ` · ${count(k)}` : ''}</button>`;
-  return `<div class="ph"><h1>Factures</h1><div class="row">${viewToggle('invoices')}<button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn" onclick="App.groupInvoice()">Facture groupée</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
+  return `<div class="ph"><h1>Factures</h1><div class="row">${viewToggle('invoices')}<button class="btn" onclick="App.go('settings')">Modèle et identité visuelle</button><button class="btn" onclick="App.groupInvoice()">Facture groupée</button><button class="btn" onclick="App.editInvoice(null,{free:true})" title="Prestation ponctuelle, sans projet suivi">Facture sans projet</button><button class="btn primary" onclick="App.editInvoice()">Nouvelle facture</button></div></div>
   <div class="tabs">${tab('all', 'Toutes')}${tab('a_verifier', 'À vérifier')}${tab('brouillon', 'Brouillons')}${tab('envoyee', 'Envoyées')}${tab('retard', 'En retard')}${tab('payee', 'Payées')}</div>
   ${list.length && layout.invoices === 'grid' ? `<div class="cgrid">${list.map(i => { const t = totals(i); return `<button class="ccard" onclick="App.go('invoice','${i.id}')"><div class="card-h"><span class="mono small">${i.number}</span>${invPill(i)}</div><div class="cn">${esc(cname(client(i.clientId)))}</div><div class="muted small">${esc(invLabel(i) === '—' ? 'Sans projet' : invLabel(i))}</div><div class="k-v mono" style="font-size:22px;font-weight:600">${fmt(t.ttc)}</div><div class="cl"><span class="muted">Échéance</span><b>${fdate(i.due)}</b></div><div class="cl"><span class="muted">Reste à payer</span><b class="mono" style="color:${t.due && isSent(i) ? 'var(--bad)' : 'inherit'}">${fmt(t.due)}</b></div></button>`; }).join('')}</div>` : `<section class="card">${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>N°</th><th>Client</th><th>Projet</th><th>Émise</th><th>Échéance</th><th class="num">Total</th><th class="num">Reste</th><th>Statut</th></tr></thead><tbody>
   ${list.map(i => { const t = totals(i); return `<tr class="click" onclick="App.go('invoice','${i.id}')"><td class="mono">${i.number}</td><td>${esc(cname(client(i.clientId)))}</td><td class="muted">${esc(invLabel(i))}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td>${invPill(i)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune facture dans cette vue.</p>'}</section>`}`;
@@ -638,7 +643,7 @@ function pInvoice(id) {
   const summary = `<section class="card"><h2>Montant</h2><div class="sum"><div><span class="muted">Sous-total HT</span><span class="mono">${fmt(t.sub)}</span></div>${t.disc ? `<div><span class="muted">Remise</span><span class="mono">− ${fmt(t.disc)}</span></div>` : ''}<div><span class="muted">TVA</span><span class="mono">${fmt(t.tva)}</span></div><div class="grand"><span>Total TTC</span><span class="mono">${fmt(t.ttc)}</span></div><div><span class="muted">Payé</span><span class="mono">${fmt(t.paid)}</span></div><div><span>Reste à payer</span><span class="mono ${t.due ? 'due' : ''}">${fmt(t.due)}</span></div></div></section>`;
   const pays = `<section class="card"><h2>Paiements</h2>${(i.payments || []).length ? `<div class="mlist">${i.payments.map(p => `<div class="mrow" style="cursor:default"><span class="mono small">${fdate(p.date)}</span><span class="mname">${esc(p.method)}${p.ref ? ' · ' + esc(p.ref) : ''}</span><b class="mono small">${fmt(p.amount)}</b>${p.proofId ? `<a class="link sm" data-proof="${p.proofId}" target="_blank" rel="noopener">Preuve</a>` : ''}${own ? `<button class="icon-btn" aria-label="Supprimer le paiement" onclick="App.delPayment('${i.id}','${p.id}')">×</button>` : ''}</div>`).join('')}</div>` : '<p class="empty">Aucun paiement enregistré.</p>'}${i.reminders?.length ? `<p class="hint">Relances : ${i.reminders.map(fdate).join(', ')}</p>` : ''}</section>`;
   if (own) {
-    if (st === 'a_verifier' || st === 'brouillon') side += `<section class="card verify"><h2>${st === 'a_verifier' ? 'Vérification avant envoi' : 'Brouillon'}</h2><p class="hint">${st === 'a_verifier' ? 'Facture préparée automatiquement à la fin du projet, acomptes déduits. Contrôlez le montant, appliquez une remise si besoin, puis validez pour l\'envoyer.' : 'Complétez la facture, puis validez-la pour l\'envoyer.'}</p>
+    if (st === 'a_verifier' || st === 'brouillon') side += `<section class="card verify"><h2>${st === 'a_verifier' ? 'Vérification avant envoi' : 'Brouillon'}</h2><p class="hint">${st === 'a_verifier' ? (i.kind === 'acompte' ? 'Acompte préparé au démarrage du projet. Vérifie le montant, puis valide pour l’envoyer au client.' : 'Facture préparée automatiquement à la fin du projet, acomptes déduits. Contrôlez le montant, appliquez une remise si besoin, puis validez pour l\'envoyer.') :'Complétez la facture, puis validez-la pour l\'envoyer.'}</p>
       <div class="disc-row"><label class="field"><span>Remise</span><input id="qd-val" type="number" min="0" step="any" value="${i.discount?.value || ''}" placeholder="0"></label><label class="field"><span>Type</span><select id="qd-type"><option value="pct" ${i.discount?.type !== 'fixed' ? 'selected' : ''}>%</option><option value="fixed" ${i.discount?.type === 'fixed' ? 'selected' : ''}>${esc(S.settings.currency)}</option></select></label><button class="btn" onclick="App.applyDiscount('${i.id}')">Appliquer</button></div>
       <div class="row"><button class="btn" onclick="App.editInvoice('${i.id}')">Modifier les lignes</button><button class="btn primary" onclick="App.validateInvoice('${i.id}')">Valider et envoyer</button></div></section>`;
     side += summary;
@@ -764,9 +769,13 @@ function doConfirm() { const f = pendingConfirm; pendingConfirm = null; closeMod
 const val = id => document.getElementById(id)?.value ?? '';
 
 /* ---------------- Clients ---------------- */
+let logoDraft;
 function editClient(id) {
   const c = id ? client(id) : { name: '', company: '', email: '', phone: '', address: '', notes: '' };
-  openModal(id ? 'Modifier le client' : 'Nouveau client', `<div class="form">
+  logoDraft = c.logo || '';
+  openModal(id ? 'Modifier le client' : 'Nouveau client', `<div class="logo-pick"><span id="f-logo-prev">${cAvatar({ ...c, logo: logoDraft }, 64)}</span><div><b>Photo ou logo</b><div class="muted small">Affiché sur ses cartes et dans son espace client. JPG ou PNG.</div>
+    <div class="row" style="margin-top:8px"><label class="btn sm">Choisir une image<input type="file" accept="image/*" hidden onchange="App.clientLogo(this)"></label><button type="button" class="btn sm ghost" id="f-logo-del" ${logoDraft ? '' : 'hidden'} onclick="App.clientLogo(null)">Retirer</button></div></div></div>
+  <div class="form">
   <label class="field"><span>Nom du contact</span><input id="f-name" value="${esc(c.name)}" placeholder="Awa Diallo"></label>
   <label class="field"><span>Entreprise (facultatif)</span><input id="f-company" value="${esc(c.company)}"></label>
   <label class="field"><span>Email</span><input id="f-email" type="email" value="${esc(c.email)}"></label>
@@ -776,11 +785,17 @@ function editClient(id) {
   `${id ? `<button class="btn ghost danger" style="margin-right:auto" onclick="App.delClient('${id}')">Supprimer</button>` : ''}<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveClient('${id || ''}')">Enregistrer</button>`);
 }
 function saveClient(id) {
-  const d = { name: val('f-name').trim(), company: val('f-company').trim(), email: val('f-email').trim(), phone: val('f-phone').trim(), address: val('f-address').trim(), notes: val('f-notes') };
+  const d = { name: val('f-name').trim(), company: val('f-company').trim(), email: val('f-email').trim(), phone: val('f-phone').trim(), address: val('f-address').trim(), notes: val('f-notes'), logo: logoDraft || '' };
   if (!d.name && !d.company) return toast('Indiquez au moins un nom ou une entreprise.');
   if (!id && !planAllows('clients')) return;
   if (id) Object.assign(client(id), d); else { id = uid(); S.clients.push({ id, ...d }); }
   save(); closeModal(); go('client', id); toast('Client enregistré');
+}
+async function clientLogo(input) {
+  if (input) { const f = input.files[0]; if (!f) return; try { logoDraft = await readImage(f, 200, f.type === 'image/png' ? 'image/png' : 'image/jpeg'); } catch (e) { return toast('Image illisible : essaie un PNG ou un JPG.'); } }
+  else logoDraft = '';
+  const nm = { name: val('f-name'), company: val('f-company') };
+  $('#f-logo-prev').innerHTML = cAvatar({ ...nm, logo: logoDraft }, 64); $('#f-logo-del').hidden = !logoDraft;
 }
 function delClient(id) {
   if (S.invoices.some(i => i.clientId === id)) return toast('Ce client a des factures : supprimez-les d\'abord pour garder une comptabilité cohérente.');
@@ -799,6 +814,7 @@ function editProject(id, cid) {
   <label class="field"><span>Client</span><select id="f-client">${S.clients.map(c => `<option value="${c.id}" ${c.id === p.clientId ? 'selected' : ''}>${esc(cname(c))}</option>`).join('')}</select></label>
   <label class="field"><span>Montant HT (${esc(S.settings.currency)})</span><input id="f-amount" type="number" min="0" step="any" value="${esc(p.amount)}"></label>
   <label class="field"><span>Date de livraison</span><input id="f-deadline" type="date" value="${esc(p.deadline)}"></label>
+  ${id ? '' : `<div class="field full"><span>Facture d'acompte au démarrage</span>${depPicker(S.settings.depositPct ?? 0)}<small class="muted">Préparée dès la création du projet, à vérifier puis envoyer au client. Elle est déduite automatiquement de la facture finale.</small></div>`}
   ${id ? '' : `<label class="field full"><span>Étapes (une par ligne)</span><textarea id="f-steps" rows="7">${DEFAULT_STEPS.join('\n')}</textarea></label>`}</div>`,
   `${id ? `<button class="btn ghost danger" style="margin-right:auto" onclick="App.delProject('${id}')">Supprimer</button>` : ''}<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveProject('${id || ''}')">Enregistrer</button>`);
 }
@@ -808,7 +824,10 @@ function saveProject(id) {
   if (id) { Object.assign(proj(id), d); log(id, 'Projet modifié'); }
   else { if (!planAllows('projects')) return; id = uid(); S.projects.push({ id, ...d, status: 'en_cours', createdAt: today(), collaborators: [], people: null, steps: val('f-steps').split('\n').map(s => s.trim()).filter(Boolean).map(label => ({ id: uid(), label, me: false, client: false })) }); log(id, 'Projet créé'); }
   const fresh = !proj(id).people; ensurePeople(proj(id));
+  let dep = null;
+  if ($('#f-dep')) { const pct = Math.min(100, Math.max(0, +val('f-dep') || 0)); S.settings.depositPct = pct; if (pct && d.amount) dep = createDeposit(proj(id), pct); }
   save(); closeModal(); go('project', id);
+  if (dep) setTimeout(() => toast(`Facture d'acompte ${dep.number} préparée (${fmt(totals(dep).ttc)}), à vérifier puis envoyer.`, 'Voir', () => go('invoice', dep.id)), 60);
   if (fresh) setTimeout(() => inviteModal(id, null, true), 120);
 }
 function delProject(id) {
@@ -945,7 +964,7 @@ function editInvoice(id, preset = {}) {
   const i = id ? invoice(id) : null;
   draft = i ? JSON.parse(JSON.stringify(i)) : { id: null, clientId: preset.clientId || S.clients[0]?.id, projectId: preset.projectId || '', kind: preset.kind || 'standard', date: today(), due: addDays(today(), +S.settings.payDays || 30), lines: preset.lines || [{ label: '', qty: 1, price: 0 }], discount: { type: 'pct', value: 0 }, tva: +S.settings.tva || 0, notes: '', status: 'brouillon', payments: [], reminders: [] };
   if (!draft.clientId) { toast('Ajoutez d\'abord un client.'); return editClient(); }
-  openModal(i ? `Modifier ${i.number}` : 'Nouvelle facture', invForm(), `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveInvoice()">Enregistrer</button>`, true);
+  openModal(i ? `Modifier ${i.number}` : preset.free ? 'Facture sans projet' : 'Nouvelle facture', (preset.free ? '<p class="hint">Pour une prestation ponctuelle (retouche, export, conseil…) : ajoute simplement tes lignes, aucun projet n’est nécessaire.</p>' : '') + invForm(), `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveInvoice()">Enregistrer</button>`, true);
 }
 /* Projets du client pas encore présents sur la facture, avec le montant restant à facturer */
 function projLinePicker(d) {
@@ -1061,7 +1080,31 @@ function saveGroupInvoice() {
   save(); closeModal(); go('invoice', i.id); toast(`Facture ${i.number} créée : ${ids.length} projet${ids.length > 1 ? 's' : ''}, à vérifier avant envoi.`);
 }
 function finalInvoice(pid) { const i = createInvoiceFromProject(proj(pid), 'brouillon'); save(); go('invoice', i.id); }
-function depositInvoice(pid) { const p = proj(pid); editInvoice(null, { clientId: p.clientId, projectId: pid, kind: 'acompte', lines: [{ label: `Acompte 30 % — ${p.title}`, qty: 1, price: round((+p.amount || 0) * .3) }] }); }
+/* Sélecteur de pourcentage d'acompte : raccourcis + saisie libre */
+function depPicker(v) {
+  return `<div class="dep-pick"><div class="seg seg-sm">${[0, 30, 50, 60, 70].map(n => `<button type="button" class="${+v === n ? 'on' : ''}" onclick="App.depSet(${n})">${n ? n + ' %' : 'Aucun'}</button>`).join('')}</div><label class="dep-free"><input id="f-dep" type="number" min="0" max="100" step="1" value="${+v || 0}" oninput="App.depSet(this.value,true)" aria-label="Pourcentage d'acompte"><span>%</span></label></div>`;
+}
+function depSet(n, typed) {
+  if (!typed) $('#f-dep').value = n;
+  document.querySelectorAll('.dep-pick .seg button').forEach(b => b.classList.toggle('on', (b.textContent === 'Aucun' ? 0 : parseInt(b.textContent)) === +n));
+}
+function createDeposit(p, pct) {
+  const i = { id: uid(), number: nextNumber(), clientId: p.clientId, projectId: p.id, kind: 'acompte', date: today(), due: addDays(today(), Math.min(+S.settings.payDays || 30, 7)), lines: [{ label: `Acompte ${pct} % — ${p.title}`, qty: 1, price: round((+p.amount || 0) * pct / 100) }], discount: { type: 'pct', value: 0 }, tva: +S.settings.tva || 0, notes: 'Acompte à régler pour lancer le projet.', status: 'a_verifier', payments: [], reminders: [], auto: true };
+  S.invoices.push(i); p.depositPct = pct;
+  log(p.id, `Facture d'acompte ${i.number} (${pct} %) préparée au démarrage du projet`);
+  return i;
+}
+function depositInvoice(pid) {
+  const p = proj(pid);
+  openModal('Facture d\'acompte', `<p class="hint">Quel pourcentage du projet « ${esc(p.title)} » (${fmt(+p.amount || 0)} HT) veux-tu demander en acompte ?</p>${depPicker(p.depositPct || S.settings.depositPct || 30)}`,
+    `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.depositGo('${pid}')">Préparer la facture</button>`);
+}
+function depositGo(pid) {
+  const p = proj(pid), pct = Math.min(100, Math.max(1, +val('f-dep') || 0));
+  if (!+val('f-dep')) return toast('Choisis un pourcentage.');
+  S.settings.depositPct = pct; p.depositPct = pct;
+  editInvoice(null, { clientId: p.clientId, projectId: pid, kind: 'acompte', lines: [{ label: `Acompte ${pct} % — ${p.title}`, qty: 1, price: round((+p.amount || 0) * pct / 100) }] });
+}
 
 /* ---------------- Dépenses & export ---------------- */
 function editExpense() {
@@ -1596,7 +1639,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal
 init();
 
 return { upgradeModal, payPick, startPayment, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
-  editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
+  editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
   addLine: () => { draft.lines.push({ label: '', qty: 1, price: 0 }); $('#m-body').innerHTML = invForm(); }, delLine: i => { draft.lines.splice(i, 1); $('#m-body').innerHTML = invForm(); }, refreshForm: () => { $('#m-body').innerHTML = invForm(); } };

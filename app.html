@@ -282,6 +282,14 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .spin{width:44px;height:44px;border-radius:50%;border:4px solid var(--accent-soft);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .pay-test{padding:10px 12px;border:1px dashed var(--line);border-radius:12px}
+.avatar.has-img{padding:0;overflow:hidden;background:var(--surface-2)}
+.avatar.has-img img{width:100%;height:100%;object-fit:cover;display:block}
+.logo-pick{display:flex;gap:14px;align-items:center;margin-bottom:14px;padding:12px;border:1px dashed var(--line);border-radius:14px}
+.dep-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dep-pick .seg{grid-template-columns:repeat(5,minmax(0,1fr));flex:1;min-width:260px}
+.seg-sm button{padding:8px 6px;font-size:13px}
+.dep-free{display:flex;align-items:center;gap:6px}
+.dep-free input{width:80px}
 .plan-chip{cursor:pointer}
 .plan-chip .up{color:var(--accent);font-weight:600}
 .plan-chip:hover{border-color:var(--accent)}
@@ -594,8 +602,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=24"></script>
+<script src="config.js?v=25"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
