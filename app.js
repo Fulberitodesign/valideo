@@ -114,10 +114,10 @@ const viewToggle = k => `<div class="vtoggle" role="group" aria-label="Affichage
 function setLayout(k, v) { layout[k] = v; try { localStorage.setItem('valideo-layout', JSON.stringify(layout)); } catch (e) {} render(); }
 /* Offres : limites appliquées aux comptes connectés (l'administrateur n'a pas de limite) */
 const PLANS = {
-  decouverte: { name: 'Découverte', price: 0, projects: 2, clients: 3 },
-  solo: { name: 'Solo', price: 9, projects: 10, clients: Infinity },
+  decouverte: { name: 'Découverte', price: 0, projects: 2, clients: 2 },
+  solo: { name: 'Solo', price: 10, projects: 10, clients: Infinity },
   pro: { name: 'Pro', price: 19, projects: Infinity, clients: Infinity },
-  studio: { name: 'Studio', price: 39, projects: Infinity, clients: Infinity }
+  studio: { name: 'Studio', price: 40, projects: Infinity, clients: Infinity }
 };
 let profile = null, adminUsers = null;
 const myPlan = () => PLANS[profile?.plan] || PLANS.decouverte;
