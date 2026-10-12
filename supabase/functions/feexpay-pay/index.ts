@@ -125,12 +125,14 @@ Deno.serve(async (req) => {
           phoneNumber: phone, amount, reseau, description, customId: String(pay.id), shop, token,
           merchant_domain: 'https://fulberitodesign.github.io', payment_interface: 'API', currency: 'XOF',
           callback_info: { payment_id: String(pay.id) }, first_name: first || 'Client', email: user.email, otp: String(body.otp || '') }) });
-    const j = await r.json().catch(() => ({}));
+    const raw = await r.text();
+    let j: Record<string, any> = {}; try { j = JSON.parse(raw); } catch { /* réponse non JSON */ }
     const reference = j?.reference || j?.data?.reference;
     if (!r.ok || !reference) {
+      console.log('FeexPay refus', r.status, raw.slice(0, 800));
       await db.from('payments').update({ status: 'failed' }).eq('id', pay.id);
-      const why = String(j?.message || j?.detail || j?.error || '');
-      return json({ error: why || 'FeexPay a refusé la demande de paiement' }, 502);
+      const why = String(j?.message || j?.detail || j?.error || j?.errors && JSON.stringify(j.errors) || '');
+      return json({ error: `${why || 'FeexPay a refusé la demande de paiement'} (code ${r.status}${why ? '' : ' · ' + raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160)})` }, 502);
     }
     await db.from('payments').update({ provider_id: String(reference) }).eq('id', pay.id);
     const out: Record<string, unknown> = { payment_id: pay.id, reference };
