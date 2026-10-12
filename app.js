@@ -286,6 +286,12 @@ function navHTML() {
   return items.map(([k, l, n]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
 }
 function render() {
+  try { renderPage(); } catch (e) {
+    console.error(e);
+    $('#main').innerHTML = `<section class="card" style="max-width:640px"><h2>Cette page n’a pas pu s’afficher</h2><p class="hint">Erreur : ${esc(e.message)}</p><div class="row"><button class="btn primary" onclick="App.go('dashboard')">Retour au tableau de bord</button><button class="btn" onclick="location.reload()">Recharger</button></div></section>`;
+  }
+}
+function renderPage() {
   if (!isOwner() && !client(view.clientId)) view = { as: 'me' };
   $('#nav').innerHTML = navHTML();
   $('#role').innerHTML = `<option value="me">Ma vue (prestataire)</option><optgroup label="Voir comme un client">` + S.clients.map(c => `<option value="${c.id}">${esc(cname(c))}</option>`).join('') + '</optgroup>';
@@ -950,7 +956,8 @@ function askReset() { confirmBox('Tout effacer ?', 'Clients, projets, médias, f
 function setFilter(kind, v) { if (kind === 'proj') projFilter = v; else invFilter = v; render(); }
 
 /* ---------------- État initial & exemples ---------------- */
-function blankState() {
+function blankState() { return migrate(rawBlank()); }
+function rawBlank() {
   return { settings: { name: '', owner: '', email: '', phone: '', address: '', siret: '', iban: 'IBAN : …', currency: '€', tva: 0, payDays: 30, prefix: 'FAC', next: 1, template: 'moderne', color: '#0b7285', logo: '', signature: '', stampTop: 'MON STUDIO', stampBottom: 'MONTAGE VIDÉO', stampCenter: 'BON POUR ACCORD', showStamp: true, legal: '', penalty: '', sample: false }, clients: [], projects: [], media: [], invoices: [], expenses: [], activity: [] };
 }
 /* ---------------- En ligne : Supabase (compte, synchro, fichiers, espaces clients) ---------------- */
@@ -976,7 +983,7 @@ const Cloud = {
       await loadProfile(); render();
       if (!S.settings.onboarded) showAuth('onboarding');
       this.subscribe(); await this.sync();
-    } catch (e) { console.warn(e); this.setStatus('error'); }
+    } catch (e) { console.warn(e); this.lastError = e.message; this.setStatus('error'); }
   },
   subscribe() {
     if (this.channel) sb.removeChannel(this.channel);
@@ -988,7 +995,7 @@ const Cloud = {
     if (this.busy) { this.again = true; return; }
     this.busy = true; this.setStatus('sync');
     try { await this.pullActions(); await this.pullRemote(); await this.uploadFiles(); await this.deleteFiles(); await this.publishPortals(); await this.push(); this.setStatus('ok'); }
-    catch (e) { console.warn(e); this.setStatus('error'); }
+    catch (e) { console.warn(e); this.lastError = e.message; this.setStatus('error'); }
     finally { this.busy = false; if (this.again) { this.again = false; setTimeout(() => this.sync(), 300); } }
   },
   async pullRemote() {
@@ -1188,11 +1195,11 @@ const accountCard = () => {
   if (!Cloud.ready) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">La connexion à Supabase n'est pas configurée (fichier config.js). L'outil fonctionne en local sur cet appareil.</p></section>`;
   if (!user) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">Vous n'êtes pas connecté.</p><button class="btn primary" style="align-self:flex-start" onclick="App.showAuth('login')">Se connecter</button></section>`;
   return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><div class="approve"><div><b>Offre ${esc(myPlan().name)}${profile?.is_admin ? ' · Administrateur' : ''}</b><div class="hint">${profile?.is_admin ? 'Aucune limite.' : `${myPlan().projects === Infinity ? 'Projets illimités' : myPlan().projects + ' projets en cours'} · ${myPlan().clients === Infinity ? 'clients illimités' : myPlan().clients + ' clients'}${profile?.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`}</div></div>${profile?.is_admin ? `<button class="btn sm" onclick="App.go('admin')">Administration</button>` : `<a class="btn sm" href="./#offres">Voir les offres</a>`}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
-    <div class="row"><button class="btn" onclick="App.syncNow()">Synchroniser maintenant</button><button class="btn ghost" onclick="App.signOut()">Se déconnecter</button></div></section>`;
+    ${Cloud.status === 'error' && Cloud.lastError ? `<p class="hint" style="color:var(--bad)">Dernière erreur : ${esc(Cloud.lastError)}</p>` : ''}<div class="row"><button class="btn" onclick="App.syncNow()">Synchroniser maintenant</button><button class="btn ghost" onclick="App.signOut()">Se déconnecter</button></div></section>`;
 };
 function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Lien copié'), () => toast(t)); }
 function sendPortal(cid) { const c = client(cid), l = portalLink(cid); openSend('Envoyer l\'espace client', [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }], `Votre espace projet · ${S.settings.name}`, `Bonjour ${c.name || ''},\n\nSuivez vos projets, validez les étapes et commentez les vidéos ici :\n${l}\n\n${S.settings.owner}`); }
-function migrate(s) { const b = blankState(); if (MODE !== 'portal') (s.projects || []).forEach(p => ensurePeople(p, s.clients || [])); s.settings = { retentionDays: 7, ...b.settings, onboarded: !!(s.settings?.name || s.settings?.owner), ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
+function migrate(s) { const b = rawBlank(); if (MODE !== 'portal') (s.projects || []).forEach(p => ensurePeople(p, s.clients || [])); s.settings = { retentionDays: 7, ...b.settings, onboarded: !!(s.settings?.name || s.settings?.owner), ...s.settings }; s.portals = s.portals || {}; s.cloud = { uploaded: {}, tooBig: {}, pendingDel: [], dirty: false, ...(s.cloud || {}) }; ['clients', 'projects', 'media', 'invoices', 'expenses', 'activity'].forEach(k => s[k] = s[k] || []); return s; }
 function sampleFrame() {
   return new Promise(res => {
     const cv = document.createElement('canvas'); cv.width = 1280; cv.height = 720; const g = cv.getContext('2d');
