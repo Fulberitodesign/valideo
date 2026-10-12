@@ -56,6 +56,33 @@ const canMoney = () => !isTeam();
 const newToken = () => (crypto.randomUUID ? crypto.randomUUID() : uid() + uid() + uid() + uid());
 const inviteLink = t => `${CFG.siteUrl || location.origin + location.pathname}?portail=${t}`;
 const rolePill = x => x.role === 'equipe' ? pill('info', 'Équipe') : pill('ok', 'Client');
+const safeUrl = u => /^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : null;
+const LINK_SERVICES = [[/drive\.google|docs\.google/i, 'Google Drive'], [/wetransfer|we\.tl/i, 'WeTransfer'], [/swisstransfer/i, 'SwissTransfer'], [/dropbox/i, 'Dropbox'], [/onedrive|1drv\.ms|sharepoint/i, 'OneDrive'], [/icloud/i, 'iCloud'], [/frame\.io/i, 'Frame.io'], [/vimeo/i, 'Vimeo'], [/youtu/i, 'YouTube'], [/mega\.(nz|io)/i, 'MEGA'], [/smash/i, 'Smash'], [/figma/i, 'Figma'], [/canva/i, 'Canva'], [/notion/i, 'Notion']];
+const linkService = u => (LINK_SERVICES.find(([re]) => re.test(u)) || [null, 'Lien'])[1];
+function linksCard(p, own) {
+  const links = p.links || [], canAdd = own || MODE === 'portal';
+  return `<section class="card"><div class="card-h"><h2>Fichiers et liens</h2>${canAdd ? `<button class="btn sm" onclick="App.addLink('${p.id}')">Ajouter un lien</button>` : ''}</div>
+    ${links.length ? `<div class="mlist">${links.slice().reverse().map(l => { const u = safeUrl(l.url); return `<div class="mrow linkrow"><span class="mtype">${esc(linkService(l.url))}</span><div class="mname" style="white-space:normal"><a href="${u ? esc(u) : '#'}" target="_blank" rel="noopener noreferrer">${esc(l.title || l.url)}</a><div class="muted small">${esc(l.by || '')}${l.by ? ' · ' : ''}${ftime(l.at)}${l.note ? ' · ' + esc(l.note) : ''}</div></div>${own ? `<button class="icon-btn" aria-label="Retirer le lien" onclick="App.delLink('${p.id}','${l.id}')">×</button>` : ''}</div>`; }).join('')}</div>`
+      : `<p class="empty">Rushs, éléments, sources ou livrables : colle ici un lien Google Drive, WeTransfer, SwissTransfer, Dropbox… Les fichiers restent chez le service choisi.</p>`}
+    ${links.some(l => /wetransfer|we\.tl|swisstransfer|smash/i.test(l.url)) ? '<p class="hint">Les liens WeTransfer, SwissTransfer ou Smash expirent au bout de quelques jours : télécharge les fichiers à temps.</p>' : ''}</section>`;
+}
+function addLink(pid) {
+  openModal('Ajouter un lien', `<p class="hint">Partage des rushs, des éléments ou des livrables. Validéo enregistre uniquement le lien, pas les fichiers.</p><div class="form">
+    <label class="field full"><span>Lien</span><input id="l-url" type="url" placeholder="https://drive.google.com/… ou https://we.tl/…" autocomplete="off"></label>
+    <label class="field full"><span>Titre <em class="muted">(facultatif)</em></span><input id="l-title" placeholder="Rushs tournage jour 1, logos HD…"></label>
+    <label class="field full"><span>Note <em class="muted">(facultatif)</em></span><input id="l-note" placeholder="Mot de passe envoyé par WhatsApp, expire le 20/10…"></label></div>`,
+    `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveLink('${pid}')">Ajouter</button>`);
+}
+function saveLink(pid) {
+  const url = safeUrl(val('l-url'));
+  if (!url) return toast('Colle un lien complet qui commence par https://');
+  const p = proj(pid), l = { id: uid(), url, title: val('l-title').trim().slice(0, 140), note: val('l-note').trim().slice(0, 200), at: new Date().toISOString(),
+    by: MODE === 'portal' ? (S.who?.name || cname(client(p.clientId))) : (S.settings.owner || 'Prestataire'), role: MODE === 'portal' ? (isTeam() ? 'team' : 'client') : 'me' };
+  (p.links = p.links || []).push(l); closeModal();
+  if (MODE === 'portal') { render(); portalSend('link', { projectId: pid, link: l }); return toast('Lien partagé'); }
+  log(pid, `Lien ajouté : ${l.title || linkService(url)}`); save(); render(); toast('Lien ajouté');
+}
+function delLink(pid, lid) { const p = proj(pid); p.links = (p.links || []).filter(l => l.id !== lid); save(); render(); }
 const CHECK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 5"/></svg>';
 /* Personnes invitées sur un projet : le contact client principal + clients et membres d'équipe ajoutés */
 function ensurePeople(p, clients) {
@@ -361,6 +388,7 @@ function pProject(id) {
       <p class="hint">${own ? 'Une étape est terminée quand vous et votre client l\'avez validée. Vous pouvez cocher pour le client s\'il vous a confirmé par message. À la dernière validation, la facture est préparée automatiquement.' : (isTeam() ? 'Vous suivez ce projet en tant que membre de l\'équipe : le client et le prestataire valident les étapes.' : 'Validez chaque étape quand elle vous convient. Votre prestataire est prévenu à chaque validation.')}</p>
       <div class="steps">${p.steps.map((s, i) => stepRow(p, s, i)).join('') || '<p class="empty">Aucune étape.</p>'}</div></section>
     <div class="stack">
+      ${linksCard(p, own)}
       <section class="card"><div class="card-h"><h2>Médias en révision</h2>${own ? `<label class="btn sm">Importer un fichier<input type="file" hidden accept="video/*,audio/*,image/*" onchange="App.uploadMedia('${p.id}',this)"></label>` : ''}</div>
         ${meds.length ? `<div class="mlist">${meds.map(m => `<button class="mrow" onclick="App.go('media','${m.id}')"><span class="mtype">${TYPE_LABEL[m.type]}</span><span class="mname">${esc(m.name)}</span><span class="mono small muted">V${m.versions.at(-1).v}</span>${mediaPill(m)}</button>`).join('')}</div>` : `<p class="empty">${own ? 'Importez une vidéo, un son ou une image : le client pourra commenter à un instant précis ou à un endroit précis.' : 'Aucun média pour l\'instant.'}</p>`}</section>
       <section class="card"><div class="card-h"><h2>Équipe et invitations</h2>${own ? `<div class="row"><button class="btn sm ghost" onclick="App.inviteModal('${p.id}')">Liens d'invitation</button><button class="btn sm" onclick="App.editCollab('${p.id}')">Ajouter</button></div>` : ''}</div>
@@ -1052,6 +1080,11 @@ function applyAction(a, cid, person, pid) {
     const m = mediaById(P.mediaId); if (!m || !okProj(proj(m.projectId)) || !P.comment || m.comments.some(c => c.id === P.comment.id)) return;
     const c = P.comment; m.comments.push({ id: String(c.id), v: +c.v, t: c.t != null ? +c.t : undefined, x: c.x != null ? +c.x : undefined, y: c.y != null ? +c.y : undefined, text: String(c.text || '').slice(0, 2000), at: c.at || new Date().toISOString(), author: own ? (team ? 'team' : 'client') : (c.author === 'team' ? 'team' : 'client'), by: own ? (person?.name || undefined) : c.by, resolved: false });
     if (own) log(m.projectId, `${whoName(proj(m.projectId))} a commenté « ${m.name} »${c.t != null ? ' à ' + tc(c.t) : ''}`);
+  } else if (a.type === 'link') {
+    const p = proj(P.projectId), l = P.link || {}, url = safeUrl(l.url);
+    if (!okProj(p) || !url || (p.links || []).some(x => x.id === l.id)) return;
+    (p.links = p.links || []).push({ id: String(l.id || uid()), url, title: String(l.title || '').slice(0, 140), note: String(l.note || '').slice(0, 200), at: l.at || new Date().toISOString(), by: own ? (person?.name || cname(client(p.clientId))) : l.by, role: own ? (team ? 'team' : 'client') : l.role });
+    if (own) log(p.id, `${whoName(p)} a partagé un lien : ${l.title || linkService(url)}`);
   } else if (a.type === 'approve') {
     const m = mediaById(P.mediaId); if (!m || !okProj(proj(m.projectId))) return;
     m.approvedV = P.value === false ? null : +P.v; m.approvedAt = P.value === false ? null : (P.date || today());
@@ -1350,7 +1383,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
