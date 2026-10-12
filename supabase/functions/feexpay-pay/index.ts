@@ -15,16 +15,17 @@ const PRICES: Record<string, Record<string, number>> = {
   studio: { month: 26200, year: 262400 },
 };
 const NAMES: Record<string, string> = { solo: 'Solo', pro: 'Pro', studio: 'Studio' };
-// Réseaux acceptés par FeexPay, par pays (indicatif + nom attendu par l'API)
+// Réseaux acceptés par FeexPay (API v2), par pays : indicatif + chemin du « requesttopay »
 const NETWORKS: Record<string, { code: string; nets: Record<string, string> }> = {
-  BENIN: { code: '229', nets: { MTN: 'MTN', MOOV: 'MOOV', CELTIIS: 'CELTIIS BJ' } },
-  COTE_D_IVOIRE: { code: '225', nets: { MTN: 'MTN CI', MOOV: 'MOOV CI', ORANGE: 'ORANGE CI', WAVE: 'WAVE CI' } },
-  TOGO: { code: '228', nets: { TOGOCOM: 'TOGOCOM TG', MOOV: 'MOOV TG' } },
-  SENEGAL: { code: '221', nets: { ORANGE: 'ORANGE SN', FREE: 'FREE SN' } },
-  BURKINA_FASO: { code: '226', nets: { MOOV: 'MOOV BF', ORANGE: 'ORANGE BF' } },
-  CONGO_BRAZZAVILLE: { code: '242', nets: { MTN: 'MTN CG' } },
+  BENIN: { code: '229', nets: { MTN: 'mtn', MOOV: 'moov', CELTIIS: 'celtiis_bj' } },
+  COTE_D_IVOIRE: { code: '225', nets: { MTN: 'mtn_ci', MOOV: 'moov_ci', ORANGE: 'orange_ci', WAVE: 'wave_ci' } },
+  TOGO: { code: '228', nets: { TOGOCOM: 'togocom_tg', MOOV: 'moov_tg' } },
+  SENEGAL: { code: '221', nets: { ORANGE: 'orange_sn', FREE: 'free_sn', WAVE: 'wave_sn' } },
+  BURKINA_FASO: { code: '226', nets: { MOOV: 'moov_bf', ORANGE: 'orange_bf', WAVE: 'wave_bf' } },
+  CONGO_BRAZZAVILLE: { code: '242', nets: { MTN: 'mtn_cg' } },
 };
-const API = 'https://api.feexpay.me/api';
+const API = 'https://api-v2.feexpay.me/api';
+const SITE = Deno.env.get('SITE_URL') || 'https://fulberitodesign.github.io/valideo/';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -37,13 +38,15 @@ const admin = () => createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SU
 // Lit le statut chez FeexPay et, s'il est réussi, active l'offre une seule fois
 async function settle(pay: Record<string, any>) {
   if (pay.status !== 'pending' || !pay.provider_id) return { status: pay.status };
-  const r = await fetch(`${API}/transactions/getrequesttopay/integration/${encodeURIComponent(pay.provider_id)}`, { headers: { Accept: 'application/json' } });
+  const r = await fetch(`${API}/transactions/public/single/status/${encodeURIComponent(pay.provider_id)}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${Deno.env.get('FEEXPAY_TOKEN')}` },
+  });
   const s = await r.json().catch(() => ({}));
   const st = String(s?.status || '').toUpperCase();
   const db = admin();
   if (st === 'SUCCESSFUL' || st === 'SUCCESS') {
     const paid = Number(s?.amount);
-    if (Number.isFinite(paid) && paid > 0 && paid < pay.amount) {
+    if (Number.isFinite(paid) && paid > 0 && paid < pay.amount * 0.9) {
       await db.from('payments').update({ status: 'mismatch' }).eq('id', pay.id).eq('status', 'pending');
       return { status: 'mismatch' };
     }
@@ -117,26 +120,27 @@ Deno.serve(async (req) => {
     const [first, ...rest] = full.split(' ');
     const description = `Valideo ${NAMES[plan]} ${period === 'year' ? '1 an' : '1 mois'}`;
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` };
+    const back = `${SITE}app.html?paiement=${pay.id}`;
+    const names = { first_name: first || 'Client', last_name: rest.join(' ') || 'Valideo' };
     const r = card
-      ? await fetch(`${API}/transactions/public/initcard`, { method: 'POST', headers, body: JSON.stringify({
-          phone, amount, shop, first_name: first || 'Client', last_name: rest.join(' ') || 'Valideo', email: user.email,
-          type_card: body.card === 'MASTERCARD' ? 'MASTERCARD' : 'VISA', currency: 'XOF' }) })
-      : await fetch(`${API}/transactions/requesttopay/integration`, { method: 'POST', headers, body: JSON.stringify({
-          phoneNumber: phone, amount, reseau, description, customId: String(pay.id), shop, token,
-          merchant_domain: 'https://fulberitodesign.github.io', payment_interface: 'API', currency: 'XOF',
-          callback_info: { payment_id: String(pay.id) }, first_name: first || 'Client', email: user.email, otp: String(body.otp || '') }) });
+      ? await fetch(`${API}/public/card`, { method: 'POST', headers, body: JSON.stringify({
+          shop, amount: String(amount), currency: 'XOF', ...names, email: user.email, phoneNumber: phone,
+          adress: 'Cotonou', city: 'Cotonou', zip: '00229', country: 'BJ', receiptUrl: back }) })
+      : await fetch(`${API}/transactions/public/requesttopay/${reseau}`, { method: 'POST', headers, body: JSON.stringify({
+          shop, amount, phoneNumber: Number(phone), ...names, description, callback_info: { payment_id: String(pay.id) },
+          return_url: back, cancel_url: back, ...(body.otp ? { otp: String(body.otp) } : {}) }) });
     const raw = await r.text();
     let j: Record<string, any> = {}; try { j = JSON.parse(raw); } catch { /* réponse non JSON */ }
     const reference = j?.reference || j?.data?.reference;
     if (!r.ok || !reference) {
       console.log('FeexPay refus', r.status, raw.slice(0, 800));
       await db.from('payments').update({ status: 'failed' }).eq('id', pay.id);
-      const why = String(j?.message || j?.detail || j?.error || j?.errors && JSON.stringify(j.errors) || '');
+      const why = String(j?.message || j?.responsemsg || j?.detail || j?.error || j?.errors && JSON.stringify(j.errors) || '');
       return json({ error: `${why || 'FeexPay a refusé la demande de paiement'} (code ${r.status}${why ? '' : ' · ' + raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160)})` }, 502);
     }
     await db.from('payments').update({ provider_id: String(reference) }).eq('id', pay.id);
     const out: Record<string, unknown> = { payment_id: pay.id, reference };
-    const link = j?.url || j?.data?.url || j?.redirect_url || j?.payment_url;
+    const link = j?.paymentUrl || j?.payment_url || j?.url || j?.data?.url || j?.redirect_url;
     if (link) out.url = link;
     // Certains réseaux répondent tout de suite
     if (String(j?.status || '').toUpperCase() === 'SUCCESSFUL') Object.assign(out, await settle({ ...pay, provider_id: String(reference) }));

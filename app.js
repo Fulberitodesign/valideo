@@ -131,8 +131,8 @@ const PAY_COUNTRIES = {
   BENIN: { name: 'Bénin', code: '229', nets: { MTN: 'MTN MoMo', MOOV: 'Moov Money', CELTIIS: 'Celtiis Cash' } },
   COTE_D_IVOIRE: { name: 'Côte d’Ivoire', code: '225', nets: { MTN: 'MTN MoMo', MOOV: 'Moov Money', ORANGE: 'Orange Money', WAVE: 'Wave' } },
   TOGO: { name: 'Togo', code: '228', nets: { TOGOCOM: 'T-Money', MOOV: 'Flooz (Moov)' } },
-  SENEGAL: { name: 'Sénégal', code: '221', nets: { ORANGE: 'Orange Money', FREE: 'Free Money' } },
-  BURKINA_FASO: { name: 'Burkina Faso', code: '226', nets: { MOOV: 'Moov Money', ORANGE: 'Orange Money' } },
+  SENEGAL: { name: 'Sénégal', code: '221', nets: { ORANGE: 'Orange Money', FREE: 'Free Money', WAVE: 'Wave' } },
+  BURKINA_FASO: { name: 'Burkina Faso', code: '226', nets: { MOOV: 'Moov Money', ORANGE: 'Orange Money', WAVE: 'Wave' } },
   CONGO_BRAZZAVILLE: { name: 'Congo-Brazzaville', code: '242', nets: { MTN: 'MTN MoMo' } }
 };
 let payWait = null;
@@ -179,7 +179,7 @@ function upgradeModal(plan) {
       <label class="field"><span>Opérateur</span><select onchange="App.payPick('network',this.value)">${Object.entries(ctry.nets).map(([k, v]) => `<option value="${k}" ${k === c.network ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>`
     : `<div class="field"><span>Carte</span><div class="seg"><button type="button" class="${c.card === 'VISA' ? 'on' : ''}" onclick="App.payPick('card','VISA')">Visa</button><button type="button" class="${c.card === 'MASTERCARD' ? 'on' : ''}" onclick="App.payPick('card','MASTERCARD')">Mastercard</button></div></div>`}
     <label class="field"><span>${mobile ? 'Numéro Mobile Money' : 'Ton numéro de téléphone'}</span><div class="phone-in"><b class="mono">+${ctry.code}</b><input id="pay-phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="${mobile && c.country === 'BENIN' ? '01 97 00 00 00' : 'Numéro sans l’indicatif'}" value="${esc(c.phone)}" oninput="App.payPick('phone',this.value,true)"></div></label>
-    ${mobile && c.network === 'ORANGE' ? `<label class="field"><span>Code de paiement Orange Money <small class="muted">(code temporaire à générer dans ton menu Orange Money)</small></span><input type="text" inputmode="numeric" value="${esc(c.otp)}" oninput="App.payPick('otp',this.value,true)"></label>` : ''}
+    ${mobile && c.network === 'ORANGE' && c.country !== 'COTE_D_IVOIRE' ? `<label class="field"><span>Code de paiement Orange Money <small class="muted">(code temporaire à générer dans ton menu Orange Money)</small></span><input type="text" inputmode="numeric" value="${esc(c.otp)}" oninput="App.payPick('otp',this.value,true)"></label>` : ''}
     <div class="sum"><div class="grand"><span>À payer</span><span class="mono">${xof(amount)}</span></div></div>
     <p class="hint">${mobile ? 'Tu reçois une demande de paiement sur ton téléphone : valide-la avec ton code secret, sans quitter Validéo.' : 'Une page sécurisée de FeexPay s’ouvre pour saisir ta carte.'} Ton offre s'active automatiquement dès la confirmation${profile?.plan_until && !planExpired() && profile.plan === c.plan ? `, et s'ajoute à la période en cours (jusqu'au ${fdate(profile.plan_until)})` : ''}.</p>`,
     `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" id="pay-go" onclick="App.startPayment()">Payer ${xof(amount)}</button>`);
