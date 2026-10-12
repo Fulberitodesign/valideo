@@ -120,12 +120,55 @@ const PLANS = {
   studio: { name: 'Studio', price: 40, projects: Infinity, clients: Infinity }
 };
 let profile = null, adminUsers = null;
-const myPlan = () => PLANS[profile?.plan] || PLANS.decouverte;
+const planExpired = () => !profile?.is_admin && profile?.plan !== 'decouverte' && profile?.plan_until && profile.plan_until < today();
+const myPlan = () => planExpired() ? PLANS.decouverte : (PLANS[profile?.plan] || PLANS.decouverte);
+/* Prix en francs CFA, identiques à ceux de la fonction serveur moneroo-checkout */
+const PRICE_XOF = { solo: { month: 6600, year: 65600 }, pro: { month: 12500, year: 124600 }, studio: { month: 26200, year: 262400 } };
+const xof = n => n.toLocaleString('fr-FR') + ' FCFA';
+let payChoice = { plan: 'pro', period: 'month', method: 'mobile' };
+function upgradeModal(plan) {
+  if (!user || !Cloud.ready) return toast('Connecte-toi à ton compte pour changer d\'offre.');
+  if (plan) payChoice.plan = plan;
+  const c = payChoice, cards = ['solo', 'pro', 'studio'].map(k => { const p = PLANS[k];
+    return `<button type="button" class="pay-plan ${c.plan === k ? 'on' : ''}" onclick="App.payPick('plan','${k}')"><b>${p.name}</b><span class="mono">${p.price} € <small>/ mois</small></span><small class="muted">${p.projects === Infinity ? 'Projets illimités' : p.projects + ' projets en cours'}</small>${k === 'pro' ? '<i class="pay-tag">Le plus choisi</i>' : ''}</button>`; }).join('');
+  const amount = PRICE_XOF[c.plan][c.period];
+  openModal('Changer d\'offre', `<div class="pay-plans">${cards}</div>
+    <div class="field"><span>Durée</span><div class="seg"><button type="button" class="${c.period === 'month' ? 'on' : ''}" onclick="App.payPick('period','month')">1 mois</button><button type="button" class="${c.period === 'year' ? 'on' : ''}" onclick="App.payPick('period','year')">1 an <em>2 mois offerts</em></button></div></div>
+    <div class="field"><span>Moyen de paiement</span><div class="seg"><button type="button" class="${c.method === 'mobile' ? 'on' : ''}" onclick="App.payPick('method','mobile')">Mobile Money <small>MTN · Moov</small></button><button type="button" class="${c.method === 'card' ? 'on' : ''}" onclick="App.payPick('method','card')">Carte bancaire</button></div></div>
+    <div class="sum"><div class="grand"><span>À payer</span><span class="mono">${xof(amount)}</span></div></div>
+    <p class="hint">Paiement sécurisé par Moneroo. Tu es redirigé vers leur page de paiement, puis ramené ici : ton offre s'active automatiquement dès la confirmation${profile?.plan_until && !planExpired() && profile.plan === c.plan ? `, et s'ajoute à la période en cours (jusqu'au ${fdate(profile.plan_until)})` : ''}.</p>`,
+    `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" id="pay-go" onclick="App.startPayment()">Payer ${xof(amount)}</button>`);
+}
+function payPick(k, v) { payChoice[k] = v; upgradeModal(); }
+async function startPayment() {
+  const b = $('#pay-go'); if (b) { b.disabled = true; b.textContent = 'Redirection vers le paiement…'; }
+  try {
+    const { data, error } = await sb.functions.invoke('moneroo-checkout', { body: payChoice });
+    if (error || !data?.checkout_url) {
+      let msg = data?.error; try { msg = msg || (await error?.context?.json())?.error; } catch (e) {}
+      throw new Error(msg || error?.message || 'Paiement indisponible');
+    }
+    location.href = data.checkout_url;
+  } catch (e) { toast('Paiement impossible : ' + e.message); if (b) { b.disabled = false; b.textContent = 'Réessayer'; } }
+}
+/* Retour depuis la page de paiement : on attend la confirmation du serveur */
+async function watchPayment(pid) {
+  history.replaceState(null, '', location.pathname + '#/settings');
+  route = { page: 'settings' }; render();
+  toast('Paiement reçu, confirmation en cours…');
+  for (let i = 0; i < 20; i++) {
+    const { data } = await sb.from('payments').select('status, plan').eq('id', pid).maybeSingle();
+    if (data?.status === 'success') { await loadProfile(); render(); return toast(`Merci ! Ton offre ${PLANS[data.plan].name} est active.`); }
+    if (data && ['failed', 'cancelled', 'mismatch'].includes(data.status)) return toast(data.status === 'cancelled' ? 'Paiement annulé : ton offre n\'a pas changé.' : 'Le paiement n\'a pas abouti. Aucun montant n\'a été validé : tu peux réessayer.');
+    await new Promise(res => setTimeout(res, 3000));
+  }
+  toast('La confirmation prend plus de temps que prévu. Ton offre s\'activera automatiquement dès que Moneroo l\'aura confirmée.');
+}
 function planAllows(kind) {
   if (!user || !profile || profile.is_admin) return true;
   const p = myPlan(), n = kind === 'projects' ? S.projects.filter(x => x.status !== 'termine').length : S.clients.length;
   if (n < p[kind]) return true;
-  toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Voir les offres', () => { location.href = './#offres'; });
+  toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Changer d\'offre', () => upgradeModal(p.name === 'Découverte' ? 'solo' : 'pro'));
   return false;
 }
 const METHODS = ['Virement', 'Mobile Money', 'Espèces', 'Carte bancaire', 'Chèque', 'PayPal'];
@@ -1184,6 +1227,10 @@ async function loadProfile() {
 function pAdmin() {
   if (!profile?.is_admin) return nf();
   if (!adminUsers) { loadAdminUsers(); return '<div class="loading">Chargement des utilisateurs…</div>'; }
+  if (!adminPays) loadAdminPays();
+  const mail = id => adminUsers.find(u => u.id === id)?.email || id.slice(0, 8);
+  const PST = { success: ['ok', 'Payé'], pending: ['warn', 'En attente'], failed: ['bad', 'Échoué'], cancelled: ['', 'Annulé'], mismatch: ['bad', 'Montant incohérent'] };
+  const paysCard = `<section class="card" style="margin-top:16px"><div class="card-h"><h2>Paiements Moneroo</h2><span class="muted small">${(adminPays || []).filter(p => p.status === 'success').length} réussis sur les 30 derniers</span></div>${!adminPays ? '<p class="hint">Chargement…</p>' : adminPays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Utilisateur</th><th>Offre</th><th>Moyen</th><th class="num">Montant</th><th>Statut</th></tr></thead><tbody>${adminPays.map(p => `<tr><td>${ftime(p.created_at)}</td><td>${esc(mail(p.user_id))}</td><td>${esc(PLANS[p.plan]?.name || p.plan)} · ${p.period === 'year' ? '1 an' : '1 mois'}</td><td>${p.method === 'card' ? 'Carte' : p.method === 'mobile' ? 'Mobile Money' : '—'}</td><td class="num">${xof(p.amount)}</td><td>${pill(...(PST[p.status] || ['', p.status]))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement pour l\'instant.</p>'}</section>`;
   const t0 = today(), paying = adminUsers.filter(u => !u.is_admin && u.plan !== 'decouverte' && (!u.plan_until || u.plan_until >= t0));
   const mrr = paying.reduce((a, u) => a + PLANS[u.plan].price, 0);
   const count = k => adminUsers.filter(u => u.plan === k && !u.is_admin).length;
@@ -1192,7 +1239,12 @@ function pAdmin() {
   <section class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Utilisateur</th><th>Inscription</th><th>Dernière connexion</th><th class="num">Clients</th><th class="num">Projets</th><th>Offre</th><th>Valable jusqu'au</th><th></th></tr></thead><tbody>
   ${adminUsers.map(u => `<tr><td><b>${esc(u.email)}</b><div class="row" style="margin-top:4px">${u.is_admin ? pill('info', 'Admin') : ''}${u.confirmed ? '' : pill('warn', 'Email non confirmé')}${u.plan_until && u.plan_until < t0 ? pill('bad', 'Offre expirée') : ''}</div></td><td>${fdate(u.created_at.slice(0, 10))}</td><td>${u.last_sign_in_at ? ftime(u.last_sign_in_at) : '—'}</td><td class="num">${u.clients}</td><td class="num">${u.projects}</td>
   <td><select id="pl-${u.id}" aria-label="Offre de ${esc(u.email)}">${Object.entries(PLANS).map(([k, p]) => `<option value="${k}" ${u.plan === k ? 'selected' : ''}>${p.name}${p.price ? ' · ' + p.price + ' €' : ''}</option>`).join('')}</select></td>
-  <td><input id="pu-${u.id}" type="date" value="${u.plan_until || ''}" aria-label="Fin de l'offre"></td><td><button class="btn sm primary" onclick="App.savePlan('${u.id}')">Enregistrer</button></td></tr>`).join('')}</tbody></table></div></section>`;
+  <td><input id="pu-${u.id}" type="date" value="${u.plan_until || ''}" aria-label="Fin de l'offre"></td><td><button class="btn sm primary" onclick="App.savePlan('${u.id}')">Enregistrer</button></td></tr>`).join('')}</tbody></table></div></section>${paysCard}`;
+}
+let adminPays = null;
+async function loadAdminPays() {
+  const { data } = await sb.from('payments').select('*').order('created_at', { ascending: false }).limit(30);
+  adminPays = data || []; if (route.page === 'admin') render();
 }
 async function loadAdminUsers() {
   const { data, error } = await sb.rpc('admin_list_users');
@@ -1216,7 +1268,7 @@ async function signOut() {
 const accountCard = () => {
   if (!Cloud.ready) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">La connexion à Supabase n'est pas configurée (fichier config.js). L'outil fonctionne en local sur cet appareil.</p></section>`;
   if (!user) return `<section class="card"><h2>Compte en ligne</h2><p class="hint">Vous n'êtes pas connecté.</p><button class="btn primary" style="align-self:flex-start" onclick="App.showAuth('login')">Se connecter</button></section>`;
-  return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><div class="approve"><div><b>Offre ${esc(myPlan().name)}${profile?.is_admin ? ' · Administrateur' : ''}</b><div class="hint">${profile?.is_admin ? 'Aucune limite.' : `${myPlan().projects === Infinity ? 'Projets illimités' : myPlan().projects + ' projets en cours'} · ${myPlan().clients === Infinity ? 'clients illimités' : myPlan().clients + ' clients'}${profile?.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`}</div></div>${profile?.is_admin ? `<button class="btn sm" onclick="App.go('admin')">Administration</button>` : `<a class="btn sm" href="./#offres">Voir les offres</a>`}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
+  return `<section class="card"><div class="card-h"><h2>Compte en ligne</h2>${pill(Cloud.status === 'error' ? 'bad' : 'ok', Cloud.status === 'error' ? 'Erreur' : 'Connecté')}</div><div class="approve"><div><b>Offre ${esc(myPlan().name)}${profile?.is_admin ? ' · Administrateur' : ''}</b><div class="hint">${profile?.is_admin ? 'Aucune limite.' : `${myPlan().projects === Infinity ? 'Projets illimités' : myPlan().projects + ' projets en cours'} · ${myPlan().clients === Infinity ? 'clients illimités' : myPlan().clients + ' clients'}${profile?.plan_until ? ' · jusqu’au ' + fdate(profile.plan_until) : ''}`}</div></div>${profile?.is_admin ? `<button class="btn sm" onclick="App.go('admin')">Administration</button>` : `<button class="btn sm primary" onclick="App.upgradeModal()">${profile?.plan && profile.plan !== 'decouverte' && !planExpired() ? 'Prolonger ou changer' : 'Changer d\'offre'}</button>`}</div><p class="hint">${esc(user.email)} · ${S.cloud.syncedAt ? 'dernière synchro ' + ftime(S.cloud.syncedAt) : 'première synchro en cours'}. Les fichiers de plus de ${CFG.maxUploadMB || 50} Mo restent sur cet appareil.</p>
     ${Cloud.status === 'error' && Cloud.lastError ? `<p class="hint" style="color:var(--bad)">Dernière erreur : ${esc(Cloud.lastError)}</p>` : ''}<div class="row"><button class="btn" onclick="App.syncNow()">Synchroniser maintenant</button><button class="btn ghost" onclick="App.signOut()">Se déconnecter</button></div></section>`;
 };
 function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast('Lien copié'), () => toast(t)); }
@@ -1419,7 +1471,8 @@ async function startApp() {
   if (!applyHash() && !isOwner()) route = { page: 'client', id: view.clientId };
   addEventListener('hashchange', () => { if (applyHash()) render(); });
   render(); purgeExpired(); setInterval(purgeExpired, 36e5);
-  Cloud.start();
+  await Cloud.start();
+  const back = QS.get('paiement'); if (back && user) watchPayment(back);
 }
 
 async function init() {
@@ -1456,7 +1509,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { upgradeModal, payPick, startPayment, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
