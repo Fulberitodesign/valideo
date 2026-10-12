@@ -125,7 +125,8 @@ const myPlan = () => planExpired() ? PLANS.decouverte : (PLANS[profile?.plan] ||
 /* Prix en francs CFA, identiques à ceux de la fonction serveur feexpay-pay */
 const PRICE_XOF = { solo: { month: 6600, year: 65600 }, pro: { month: 12500, year: 124600 }, studio: { month: 26200, year: 262400 } };
 const xof = n => n.toLocaleString('fr-FR') + ' FCFA';
-let payChoice = { plan: 'pro', period: 'month', method: 'mobile', country: 'BENIN', network: 'MTN', phone: '', otp: '', card: 'VISA', test: false };
+let payChoice = { plan: 'pro', period: 'month', method: 'mobile', country: 'BENIN', network: 'MTN', phone: '', otp: '', card: 'VISA', test: false, mini: false };
+const payAmount = c => c.mini && !c.test ? 100 : PRICE_XOF[c.plan][c.period];
 /* Mode test FeexPay (sandbox) : visible pour l'administrateur, ou avec ?testpay dans l'adresse ; le serveur vérifie le droit */
 const payTestable = () => !!profile?.is_admin || QS.has('testpay');
 /* Pays et opérateurs Mobile Money pris en charge par FeexPay */
@@ -171,7 +172,7 @@ function upgradeModal(plan) {
   payWait = null;
   const c = payChoice, cards = ['solo', 'pro', 'studio'].map(k => { const p = PLANS[k];
     return `<button type="button" class="pay-plan ${c.plan === k ? 'on' : ''}" onclick="App.payPick('plan','${k}')"><b>${p.name}</b><span class="mono">${p.price} € <small>/ mois</small></span><small class="muted">${p.projects === Infinity ? 'Projets illimités' : p.projects + ' projets en cours'}</small>${k === 'pro' ? '<i class="pay-tag">Le plus choisi</i>' : ''}</button>`; }).join('');
-  const amount = PRICE_XOF[c.plan][c.period], ctry = PAY_COUNTRIES[c.country];
+  const amount = payAmount(c), ctry = PAY_COUNTRIES[c.country];
   if (!ctry.nets[c.network]) c.network = Object.keys(ctry.nets)[0];
   const mobile = c.method === 'mobile';
   openModal('Changer d\'offre', `<div class="pay-plans">${cards}</div>
@@ -182,8 +183,9 @@ function upgradeModal(plan) {
     : `<div class="field"><span>Carte</span><div class="seg"><button type="button" class="${c.card === 'VISA' ? 'on' : ''}" onclick="App.payPick('card','VISA')">Visa</button><button type="button" class="${c.card === 'MASTERCARD' ? 'on' : ''}" onclick="App.payPick('card','MASTERCARD')">Mastercard</button></div></div>`}
     <label class="field"><span>${mobile ? 'Numéro Mobile Money' : 'Ton numéro de téléphone'}</span><div class="phone-in"><b class="mono">+${ctry.code}</b><input id="pay-phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="${mobile && c.country === 'BENIN' ? '01 97 00 00 00' : 'Numéro sans l’indicatif'}" value="${esc(c.phone)}" oninput="App.payPick('phone',this.value,true)"></div></label>
     ${mobile && c.network === 'ORANGE' && c.country !== 'COTE_D_IVOIRE' ? `<label class="field"><span>Code de paiement Orange Money <small class="muted">(code temporaire à générer dans ton menu Orange Money)</small></span><input type="text" inputmode="numeric" value="${esc(c.otp)}" oninput="App.payPick('otp',this.value,true)"></label>` : ''}
-    ${payTestable() ? `<label class="check pay-test"><input type="checkbox" ${c.test ? 'checked' : ''} onchange="App.payPick('test',this.checked)"> <span><b>Mode test</b> · aucun argent réel. Numéro finissant par <b class="mono">00</b> = réussi, <b class="mono">01</b> = solde insuffisant, <b class="mono">05</b> = en attente puis réussi.</span></label>` : ''}
-    <div class="sum"><div class="grand"><span>À payer${c.test ? ' <small class="pill warn">test</small>' : ''}</span><span class="mono">${xof(amount)}</span></div></div>
+    ${payTestable() ? `<label class="check pay-test"><input type="checkbox" ${c.test ? 'checked' : ''} onchange="App.payPick('mini',false,true); App.payPick('test',this.checked)"> <span><b>Mode test</b> · aucun argent réel. Numéro finissant par <b class="mono">00</b> = réussi, <b class="mono">01</b> = solde insuffisant, <b class="mono">05</b> = en attente puis réussi.</span></label>
+    <label class="check pay-test"><input type="checkbox" ${c.mini && !c.test ? 'checked' : ''} onchange="App.payPick('test',false,true); App.payPick('mini',this.checked)"> <span><b>Test réel à 100 FCFA</b> · vrai paiement (carte ou Mobile Money) pour vérifier tout le parcours ; l’offre choisie s’active comme pour un paiement normal.</span></label>` : ''}
+    <div class="sum"><div class="grand"><span>À payer${c.test ? ' <small class="pill warn">test</small>' : c.mini ? ' <small class="pill warn">test réel</small>' : ''}</span><span class="mono">${xof(amount)}</span></div></div>
     <p class="hint">${mobile ? 'Tu reçois une demande de paiement sur ton téléphone : valide-la avec ton code secret, sans quitter Validéo.' : 'Une page sécurisée de FeexPay s’ouvre pour saisir ta carte.'} Ton offre s'active automatiquement dès la confirmation${profile?.plan_until && !planExpired() && profile.plan === c.plan ? `, et s'ajoute à la période en cours (jusqu'au ${fdate(profile.plan_until)})` : ''}.</p>`,
     `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" id="pay-go" onclick="App.startPayment()">Payer ${xof(amount)}</button>`);
 }
@@ -209,7 +211,7 @@ function payWaitScreen(d) {
   const tip = d.test ? 'Mode test : rien n’arrive sur le téléphone, FeexPay simule la réponse.' : !mobile ? '' : c.network === 'MTN' ? 'Si rien ne s’affiche, ouvre ton menu MoMo <b class="mono">*880#</b> pour approuver.' : c.network === 'MOOV' ? 'Si rien ne s’affiche, ouvre ton menu Moov Money <b class="mono">*855#</b> pour approuver.' : 'Garde ton téléphone à portée de main.';
   openModal('Validation du paiement', `<div class="pay-wait"><div class="spin"></div>
     <h3>${mobile ? `Valide le paiement sur ton téléphone` : 'Termine le paiement par carte'}</h3>
-    <p>${mobile ? `Une demande ${esc(net)} de <b>${xof(PRICE_XOF[c.plan][c.period])}</b> vient d’être envoyée au <b class="mono">+${PAY_COUNTRIES[c.country].code} ${esc(c.phone)}</b>. Saisis ton code secret pour l’accepter.` : 'Saisis ta carte sur la page sécurisée de FeexPay, puis reviens ici.'}</p>
+    <p>${mobile ? `Une demande ${esc(net)} de <b>${xof(payAmount(c))}</b> vient d’être envoyée au <b class="mono">+${PAY_COUNTRIES[c.country].code} ${esc(c.phone)}</b>. Saisis ton code secret pour l’accepter.` : 'Saisis ta carte sur la page sécurisée de FeexPay, puis reviens ici.'}</p>
     ${d.url ? `<a class="btn primary" href="${esc(d.url)}" target="_blank" rel="noopener">Ouvrir la page de paiement</a>` : ''}
     <p class="hint">${tip} Cette fenêtre se met à jour toute seule dès la confirmation.</p></div>`,
     `<button class="btn" onclick="App.upgradeModal()">Modifier</button>`);

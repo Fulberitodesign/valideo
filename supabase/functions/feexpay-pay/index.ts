@@ -104,15 +104,16 @@ Deno.serve(async (req) => {
 
     if (body.action !== 'start') return json({ error: 'Action inconnue' }, 400);
     const { plan, period } = body;
-    const amount = PRICES[plan]?.[period];
-    if (!amount) return json({ error: 'Offre ou période inconnue' }, 400);
-    let mode = MODES.live;
-    if (body.test) {
+    if (!PRICES[plan]?.[period]) return json({ error: 'Offre ou période inconnue' }, 400);
+    // Mode test (sandbox) et « test réel à 100 FCFA » : réservés à l'administrateur et aux testeurs déclarés
+    if (body.test || body.mini) {
       const testers = String(Deno.env.get('FEEXPAY_TEST_USERS') || '').toLowerCase().split(',').map((x) => x.trim()).filter(Boolean);
       const { data: prof } = await admin().from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
       if (!prof?.is_admin && !testers.includes(String(user.email).toLowerCase())) return json({ error: 'Le mode test est réservé à l’administrateur' }, 403);
-      mode = MODES.test;
     }
+    const amount = body.mini && !body.test ? 100 : PRICES[plan][period];
+    let mode = MODES.live;
+    if (body.test) mode = MODES.test;
     const API = mode.api, token = Deno.env.get(mode.token), shop = Deno.env.get(mode.shop);
     if (!token || !shop) return json({ error: mode === MODES.test ? 'Mode test non configuré (clés sandbox manquantes)' : 'Le paiement en ligne n\'est pas encore configuré' }, 503);
 
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
 
     const full = String(user.user_metadata?.full_name || user.user_metadata?.name || '').trim() || (user.email || 'Client').split('@')[0];
     const [first, ...rest] = full.split(' ');
-    const description = `Valideo ${NAMES[plan]} ${period === 'year' ? '1 an' : '1 mois'}`;
+    const description = `Valideo ${NAMES[plan]} ${period === 'year' ? '1 an' : '1 mois'}${amount === 100 ? ' test' : ''}`;
     const headers = { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` };
     const back = `${SITE}app.html?paiement=${pay.id}`;
     const names = { first_name: first || 'Client', last_name: rest.join(' ') || 'Valideo' };
