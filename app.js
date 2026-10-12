@@ -214,8 +214,10 @@ function payWaitScreen(d) {
     <p>${mobile ? `Une demande ${esc(net)} de <b>${xof(payAmount(c))}</b> vient d’être envoyée au <b class="mono">+${PAY_COUNTRIES[c.country].code} ${esc(c.phone)}</b>. Saisis ton code secret pour l’accepter.` : 'Saisis ta carte sur la page sécurisée de FeexPay, puis reviens ici.'}</p>
     ${d.url ? `<a class="btn primary" href="${esc(d.url)}" target="_blank" rel="noopener">Ouvrir la page de paiement</a>` : ''}
     <p class="hint">${tip} Cette fenêtre se met à jour toute seule dès la confirmation.</p></div>`,
-    `<button class="btn" onclick="App.upgradeModal()">Modifier</button>`);
+    `<button class="btn" onclick="App.upgradeModal()">Modifier</button>${c.method === 'mobile' ? '<button class="btn primary" id="pay-resend" disabled onclick="App.payResend()">Renvoyer la demande</button>' : ''}`);
   if (d.url) window.open(d.url, '_blank', 'noopener');
+  // Le bouton « Renvoyer » s'active après un court délai, le temps que la première demande arrive
+  let wait = 15; const tick = setInterval(() => { const b = $('#pay-resend'); if (!b) return clearInterval(tick); if (--wait > 0) b.textContent = `Renvoyer la demande (${wait} s)`; else { b.disabled = false; b.textContent = 'Renvoyer la demande'; clearInterval(tick); } }, 1000);
   const me = payWait = { id: d.payment_id };
   (async () => {
     for (let i = 0; i < 75 && payWait === me; i++) {
@@ -227,6 +229,12 @@ function payWaitScreen(d) {
     }
     if (payWait === me) { payWait = null; closeModal(); myPays = null; toast('Pas encore de confirmation. Si tu as validé, ton offre s\'activera automatiquement d\'ici quelques minutes.'); if (route.page === 'plan') render(); }
   })();
+}
+/* Nouvelle demande sur le téléphone : l'ancienne est abandonnée, une nouvelle est créée avec les mêmes choix */
+async function payResend() {
+  payWait = null; const b = $('#pay-resend'); if (b) { b.disabled = true; b.textContent = 'Envoi…'; }
+  await startPayment();
+  const b2 = $('#pay-resend'); if (b2 && b2.textContent === 'Envoi…') { b2.disabled = false; b2.textContent = 'Renvoyer la demande'; }
 }
 async function payDone(plan) {
   payWait = null; closeModal(); await loadProfile(); myPays = null;
@@ -1649,7 +1657,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { upgradeModal, payPick, startPayment, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
