@@ -294,6 +294,9 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 .me-chip .avatar{border-radius:50%}
 .pdf-box{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:12px;padding:12px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft)}
 .pdf-box>div:first-child{flex:1;min-width:220px}
+.dl-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dl-pick input{width:170px;flex:none}
+.dl-pick .seg{grid-template-columns:repeat(5,minmax(0,1fr));flex:1;min-width:300px}
 .plan-chip{cursor:pointer}
 .plan-chip .up{color:var(--accent);font-weight:600}
 .plan-chip:hover{border-color:var(--accent)}
@@ -607,8 +610,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:14px}
 </div>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="config.js?v=28"></script>
+<script src="config.js?v=29"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

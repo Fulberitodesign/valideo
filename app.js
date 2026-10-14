@@ -831,10 +831,22 @@ function editProject(id, cid) {
   <label class="field full"><span>Titre du projet</span><input id="f-title" value="${esc(p.title)}" placeholder="Clip de lancement, film d'entreprise…"></label>
   <label class="field"><span>Client</span><select id="f-client">${S.clients.map(c => `<option value="${c.id}" ${c.id === p.clientId ? 'selected' : ''}>${esc(cname(c))}</option>`).join('')}</select></label>
   <label class="field"><span>Montant HT (${esc(S.settings.currency)})</span><input id="f-amount" type="number" min="0" step="any" value="${esc(p.amount)}"></label>
-  <label class="field"><span>Date de livraison</span><input id="f-deadline" type="date" value="${esc(p.deadline)}"></label>
+  <div class="field full"><span>Délai de livraison (fin du projet)</span><div class="dl-pick"><input id="f-deadline" type="date" value="${esc(p.deadline || '')}" oninput="App.dlSet()" aria-label="Date de livraison"><div class="seg seg-sm">${DL_QUICK.map(([n, l]) => `<button type="button" onclick="App.dlSet(${n})">${l}</button>`).join('')}</div></div><small class="muted" id="f-dl-info">${dlInfo(p.deadline)}</small></div>
   ${id ? '' : `<div class="field full"><span>Facture d'acompte au démarrage</span>${depPicker(S.settings.depositPct ?? 0)}<small class="muted">Préparée dès la création du projet, à vérifier puis envoyer au client. Elle est déduite automatiquement de la facture finale.</small></div>`}
   ${id ? '' : `<label class="field full"><span>Étapes (une par ligne)</span><textarea id="f-steps" rows="7">${DEFAULT_STEPS.join('\n')}</textarea></label>`}</div>`,
   `${id ? `<button class="btn ghost danger" style="margin-right:auto" onclick="App.delProject('${id}')">Supprimer</button>` : ''}<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveProject('${id || ''}')">Enregistrer</button>`);
+}
+/* Délai de livraison : une date précise, ou un délai en jours à partir d'aujourd'hui */
+const DL_QUICK = [[3, '3 jours'], [7, '1 semaine'], [14, '2 semaines'], [30, '1 mois'], [-1, 'Sans délai']];
+function dlInfo(d) {
+  if (!d) return 'Aucune date de livraison : le projet n’aura pas d’alerte de délai.';
+  const n = diffDays(today(), d);
+  return `Livraison le ${fdate(d)} · ${n > 1 ? 'dans ' + n + ' jours' : n === 1 ? 'demain' : n === 0 ? 'aujourd’hui' : 'date déjà passée'}. Une alerte s’affiche 3 jours avant.`;
+}
+function dlSet(n) {
+  const el = $('#f-deadline'); if (!el) return;
+  if (n !== undefined) el.value = n < 0 ? '' : addDays(today(), n);
+  $('#f-dl-info').textContent = dlInfo(el.value);
 }
 function saveProject(id) {
   const d = { title: val('f-title').trim(), clientId: val('f-client'), amount: +val('f-amount') || 0, deadline: val('f-deadline') };
@@ -1703,7 +1715,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
