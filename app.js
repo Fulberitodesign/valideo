@@ -495,7 +495,7 @@ function pDashboard() {
   return `${away}${fresh ? `<section class="card" style="margin-bottom:18px"><div class="card-h"><h2>Bienvenue sur Validéo</h2><a class="link" href="guide.html" target="_blank" rel="noopener">Lire le guide</a></div><div class="alerts">${[['1', 'Renseigne ton identité', 'Nom, logo, couleur, signature : tes factures seront à ton image.', 'settings', S.settings.name ? 'Fait' : ''], ['2', 'Ajoute ton premier client', 'Son email et son WhatsApp pour lui envoyer les alertes.', 'clients', ''], ['3', 'Crée ton premier projet', 'Montant, date de livraison et étapes à valider.', 'projects', '']].map(([n, t, d, pg, done]) => `<div class="alert ${done ? 'ok' : 'info'}"><span class="sev"></span><div><div class="a-t">${n}. ${t}</div><div class="a-s">${d}</div></div><button class="btn sm ${done ? '' : 'primary'}" onclick="${pg === 'clients' ? 'App.editClient()' : pg === 'projects' ? 'App.editProject()' : `App.go('${pg}')`}">${done || 'Commencer'}</button></div>`).join('')}</div>${user ? '' : `<p class="hint">Pense à <a onclick="App.go('settings')">créer ton compte en ligne</a> pour retrouver tes données sur tous tes appareils.</p>`}</section>` : ''}${DEMO ? `<div class="banner"><span><b>Mode démo</b> : clients, projets et factures fictifs. Rien n'est enregistré en ligne. Utilisez « Affichage », en haut à droite, pour voir l'espace d'un client.</span><a class="btn sm primary" href="app.html#inscription">Créer mon compte</a></div>` : S.settings.sample ? `<div class="banner"><span>Cet appareil contient encore des <b>données d'exemple</b>.</span><button class="btn sm" onclick="App.askReset()">Effacer les exemples et commencer</button></div>` : ''}
   <div class="ph"><div><div class="eyebrow">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour${S.settings.owner ? ' ' + esc(S.settings.owner.split(' ')[0]) : ''}</h1></div>
   <div class="row"><button class="btn" onclick="App.editClient()">Nouveau client</button><button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
-  <div class="kpis">${kpi('Projets en cours', active.length, `${S.projects.filter(p => p.status === 'termine').length} terminés`)}${kpi('À encaisser', fmt(toCollect), 'factures envoyées')}${kpi('En retard', fmt(late), `${lateN} facture${lateN > 1 ? 's' : ''}`, late ? 'bad' : '')}${kpi('Encaissé ce mois', fmt(month), new Date().toLocaleDateString('fr-FR', { month: 'long' }), 'ok')}</div>
+  <div class="kpis">${kpi('Clients', S.clients.length, `${new Set(active.map(p => p.clientId)).size} avec un projet en cours`)}${kpi('Projets en cours', active.length, `${S.projects.filter(p => p.status === 'termine').length} terminés`)}${kpi('À encaisser', fmt(toCollect), 'factures envoyées')}${kpi('En retard', fmt(late), `${lateN} facture${lateN > 1 ? 's' : ''}`, late ? 'bad' : '')}${kpi('Encaissé ce mois', fmt(month), new Date().toLocaleDateString('fr-FR', { month: 'long' }), 'ok')}</div>
   <div class="grid2"><section class="card"><div class="card-h"><h2>À traiter</h2><span class="muted small">${al.length} élément${al.length > 1 ? 's' : ''}</span></div>${alertList(al)}</section>
   <div class="stack"><section class="card"><div class="card-h"><h2>Projets en cours</h2><button class="link" onclick="App.go('projects')">Tous les projets</button></div>${active.length ? `<div class="plist">${active.map(p => projRow(p)).join('')}</div>` : `<p class="empty">Aucun projet en cours.</p>`}</section>
   <section class="card"><h2>Dernières activités</h2>${actList(recent, true)}</section></div></div>`;
@@ -546,7 +546,7 @@ function pProject(id) {
   const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final') || projectBilled(p.id) >= (+p.amount || 0) - .005;
   return `<div class="crumbs">${own ? `<a onclick="App.go('projects')">Projets</a> / <a onclick="App.go('client','${c.id}')">${esc(cname(c))}</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
   <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>${canMoney() ? `·<span class="mono">${fmt(p.amount)} HT</span>` : ''}${deadlinePill(p)}</div></div>
-  ${own ? `<div class="row"><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
+  ${own ? `<div class="row"><button class="btn ghost danger" onclick="App.delProject('${p.id}')">Supprimer</button><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
   ${stepper(p)}
   <div class="grid2 wide-left">
     <section class="card"><div class="card-h"><h2>Étapes</h2>${own ? `<button class="btn sm ghost" onclick="App.addStep('${p.id}')">Ajouter une étape</button>` : ''}</div>
@@ -671,7 +671,7 @@ function pInvoice(id) {
     side = summary + `<section class="card"><h2>Comment régler</h2><pre class="hint" style="white-space:pre-wrap;font:inherit;margin:0">${esc(S.settings.iban)}</pre><p class="hint">Indiquez la référence <b class="mono">${esc(i.number)}</b> avec votre paiement.</p></section>` + pays;
   }
   return `<div class="crumbs">${own ? `<a onclick="App.go('invoices')">Factures</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
-  <div class="ph"><div><h1 class="mono">${esc(i.number)}</h1><div class="meta">${esc(cname(c))} · <span class="mono">${fmt(t.ttc)}</span> ${invPill(i)}</div></div><button class="btn" onclick="window.print()">Imprimer / enregistrer en PDF</button></div>
+  <div class="ph"><div><h1 class="mono">${esc(i.number)}</h1><div class="meta">${esc(cname(c))} · <span class="mono">${fmt(t.ttc)}</span> ${invPill(i)}</div></div><div class="row"><button class="btn" onclick="window.print()">Imprimer</button><button class="btn primary" onclick="App.pdfDownload('${i.id}')">Télécharger le PDF</button></div></div>
   <div class="inv-layout"><div class="paper-wrap" id="print-area">${invoiceDoc(i)}</div><aside class="stack">${side}</aside></div>`;
 }
 
@@ -849,8 +849,17 @@ function saveProject(id) {
   if (fresh) setTimeout(() => inviteModal(id, null, true), 120);
 }
 function delProject(id) {
-  if (S.invoices.some(i => i.projectId === id)) return toast('Ce projet a des factures : supprimez-les d\'abord.');
-  confirmBox('Supprimer ce projet ?', 'Les étapes, médias et commentaires seront supprimés.', 'Supprimer', () => { S.media = S.media.filter(m => m.projectId !== id); S.projects = S.projects.filter(p => p.id !== id); save(); go('projects'); });
+  const p = proj(id), linked = S.invoices.filter(i => invHas(i, id)), drafts = linked.filter(i => !isSent(i)), sent = linked.filter(isSent);
+  const info = ['Les étapes, médias, commentaires et liens seront supprimés.'];
+  if (drafts.length) info.push(`${drafts.length} facture${drafts.length > 1 ? 's' : ''} non envoyée${drafts.length > 1 ? 's' : ''} (${drafts.map(i => i.number).join(', ')}) aussi supprimée${drafts.length > 1 ? 's' : ''}.`);
+  if (sent.length) info.push(`${sent.length} facture${sent.length > 1 ? 's' : ''} déjà envoyée${sent.length > 1 ? 's' : ''} (${sent.map(i => i.number).join(', ')}) conservée${sent.length > 1 ? 's' : ''} pour ta comptabilité, sans lien vers le projet. Supprime-la depuis Factures si c'était une erreur.`);
+  confirmBox(`Supprimer « ${p.title} » ?`, info.join(' '), 'Supprimer le projet', () => {
+    S.invoices = S.invoices.filter(i => !drafts.includes(i));
+    sent.forEach(i => { if (i.projectId === id) i.projectId = ''; i.projectIds = (i.projectIds || []).filter(x => x !== id); (i.lines || []).forEach(l => { if (l.projectId === id) delete l.projectId; }); });
+    S.media = S.media.filter(m => m.projectId !== id); S.projects = S.projects.filter(x => x.id !== id);
+    S.activity = (S.activity || []).filter(a => a.pid !== id);
+    save(); go('projects'); toast('Projet supprimé');
+  });
 }
 function toggleStep(pid, sid, side) {
   const p = proj(pid), s = p.steps.find(x => x.id === sid); if (!s) return;
@@ -898,6 +907,42 @@ function inviteModal(pid, personId, fresh) {
   <div class="row"><button class="btn sm" onclick="App.copyText('${inviteLink(x.token)}')">Copier</button>${x.email ? `<a class="btn sm" href="mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent('Invitation au projet ' + p.title)}&body=${encodeURIComponent(msgFor(x))}">Email</a>` : ''}${x.phone ? `<a class="btn sm wa" target="_blank" rel="noopener" href="https://wa.me/${x.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(msgFor(x))}">WhatsApp</a>` : ''}</div></div>`).join('')}</div>`,
   `<button class="btn" onclick="App.editCollab('${pid}')">Ajouter une personne</button><button class="btn primary" onclick="App.closeModal()">Terminé</button>`, true);
 }
+
+/* ---------------- Facture en PDF ---------------- */
+/* Les liens mailto: et WhatsApp ne peuvent pas porter de pièce jointe : on fabrique un vrai PDF,
+   partagé avec le menu de partage de l'appareil (qui, lui, sait joindre un fichier) ou téléchargé. */
+const loadScript = src => new Promise((res, rej) => { if ([...document.scripts].some(x => x.src === src)) return res(); const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('Connexion requise pour créer le PDF')); document.head.appendChild(el); });
+const pdfCache = {};
+function invoicePDF(id) {
+  const i = invoice(id), key = JSON.stringify(i) + [S.settings.template, S.settings.color, S.settings.name, (S.settings.logo || '').length, (S.settings.signature || '').length].join('|');
+  if (pdfCache[key]) return pdfCache[key];
+  return pdfCache[key] = (async () => {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff';
+    box.innerHTML = invoiceDoc(i); document.body.appendChild(box);
+    const paper = box.firstElementChild; paper.style.boxShadow = 'none'; paper.style.borderRadius = '0'; paper.style.minHeight = '1123px';
+    try {
+      const blob = await window.html2pdf().set({ margin: 0, image: { type: 'jpeg', quality: .95 }, html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true }, jsPDF: { unit: 'px', format: [794, 1123], hotfixes: ['px_scaling'] }, pagebreak: { mode: ['css', 'legacy'] } }).from(paper).outputPdf('blob');
+      return new File([blob], `Facture ${i.number}.pdf`, { type: 'application/pdf' });
+    } finally { box.remove(); }
+  })().catch(e => { delete pdfCache[key]; throw e; });
+}
+async function pdfShare(id) {
+  const b = $('#pdf-share'); if (b) { b.disabled = true; b.textContent = 'Préparation du PDF…'; }
+  try {
+    const f = await invoicePDF(id), text = $('#nt-msg')?.value || '';
+    if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], title: f.name, text }); } catch (e) { if (e.name !== 'AbortError') throw e; } }
+    else { download(f.name, f); toast('PDF téléchargé : ajoute-le à ton email ou à WhatsApp.'); }
+  } catch (e) { toast('PDF impossible : ' + e.message); }
+  if (b) { b.disabled = false; b.textContent = 'Partager avec le PDF'; }
+}
+async function pdfDownload(id) {
+  toast('Création du PDF…');
+  try { const f = await invoicePDF(id); download(f.name, f); } catch (e) { toast('PDF impossible : ' + e.message); }
+}
+const pdfTools = id => `<div class="pdf-box"><div><b>Joindre la facture en PDF</b><div class="muted small">${navigator.canShare ? '« Partager avec le PDF » ouvre le menu de partage de ton appareil : choisis WhatsApp ou ta messagerie, le PDF et le message sont déjà joints.' : 'Les liens Email et WhatsApp ne peuvent pas joindre de fichier : télécharge le PDF puis ajoute-le à ton message.'}</div></div>
+  <div class="row">${navigator.canShare ? `<button class="btn sm primary" id="pdf-share" onclick="App.pdfShare('${id}')">Partager avec le PDF</button>` : ''}<button class="btn sm" onclick="App.pdfDownload('${id}')">Télécharger le PDF</button></div></div>`;
 
 /* ---------------- Notifications email / WhatsApp ---------------- */
 function openSend(title, people, subject, msg, onSent) {
@@ -1035,15 +1080,16 @@ function validateInvoice(id) { const i = invoice(id); i.status = 'envoyee'; i.se
 function sendInvoice(id) {
   const i = invoice(id), c = client(i.clientId), t = totals(i), p = proj(i.projectId);
   openSend(`Envoyer ${i.number}`, [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }], `Facture ${i.number} · ${S.settings.name}`,
-    `Bonjour ${c.name || ''},\n\nVeuillez trouver ci-joint la facture ${i.number}${p ? ` pour le projet « ${p.title} »` : ''}, d'un montant de ${fmt(t.ttc)}, payable avant le ${fdate(i.due)}.\n\nCoordonnées de paiement :\n${S.settings.iban}\n\nMerci pour votre confiance,\n${S.settings.owner} · ${S.settings.name}`,
+    `Bonjour ${c.name || ''},\n\nVeuillez trouver ci-joint la facture ${i.number}${p ? ` pour le projet « ${p.title} »` : ''}, d'un montant de ${fmt(t.ttc)}, payable avant le ${fdate(i.due)}.${portalLink(c.id) ? `\n\nConsulter et télécharger la facture en ligne :\n${portalLink(c.id)}&facture=${i.id}` : ''}\n\nCoordonnées de paiement :\n${S.settings.iban}\n\nMerci pour votre confiance,\n${S.settings.owner} · ${S.settings.name}`,
     (x, k) => { log(i.projectId, `Facture ${i.number} envoyée par ${k === 'mail' ? 'email' : 'WhatsApp'}`); save(); });
-  $('#m-body').insertAdjacentHTML('beforeend', `<p class="hint">Pour joindre le PDF : fermez cette fenêtre, cliquez sur « Imprimer / enregistrer en PDF », puis ajoutez le fichier à votre message.</p>`);
+  $('#m-body').insertAdjacentHTML('beforeend', pdfTools(id)); invoicePDF(id).catch(() => {});
 }
 function remind(id) {
   const i = invoice(id), c = client(i.clientId), t = totals(i), late = diffDays(i.due, today()), n = (i.reminders || []).length;
   openSend(`Relancer ${i.number}`, [{ name: cname(c), role: 'Client', email: c.email, phone: c.phone }], `${n ? 'Nouvelle relance' : 'Rappel'} · facture ${i.number}`,
     `Bonjour ${c.name || ''},\n\n${late > 0 ? `Sauf erreur de ma part, la facture ${i.number} arrivée à échéance le ${fdate(i.due)} (il y a ${late} jours) reste impayée.` : `Petit rappel : la facture ${i.number} arrive à échéance le ${fdate(i.due)}.`} Le montant restant dû est de ${fmt(t.due)}.\n\nCoordonnées de paiement :\n${S.settings.iban}\n\nSi le règlement a déjà été effectué, merci de ne pas tenir compte de ce message et de m'envoyer la preuve de paiement.\n\nCordialement,\n${S.settings.owner}`,
     (x, k) => { i.reminders = i.reminders || []; if (i.reminders.at(-1) !== today()) i.reminders.push(today()); log(i.projectId, `Relance ${i.number} envoyée par ${k === 'mail' ? 'email' : 'WhatsApp'}`); save(); });
+  $('#m-body').insertAdjacentHTML('beforeend', pdfTools(id)); invoicePDF(id).catch(() => {});
 }
 function payModal(id) {
   const i = invoice(id), t = totals(i);
@@ -1364,7 +1410,7 @@ async function loadPortal(first) {
   if (error || !data?.data) { if (first) $('#main').innerHTML = `<div class="loading"><div class="card" style="max-width:420px;text-align:center"><h2>Lien invalide ou expiré</h2><p class="hint">Demandez un nouveau lien à la personne qui vous a invité.</p></div></div>`; return; }
   S = migrate(data.data); S.urls = data.data.urls || {};
   (data.pending || []).forEach(a => applyAction(a));
-  view = { as: 'client', clientId: S.clients[0].id }; if (first) route = S.who ? { page: 'project', id: S.projects[0]?.id } : { page: 'client', id: view.clientId };
+  view = { as: 'client', clientId: S.clients[0].id }; const fx = QS.get('facture'); if (first && fx && S.invoices.some(x => x.id === fx)) route = { page: 'invoice', id: fx }; else if (first) route = S.who ? { page: 'project', id: S.projects[0]?.id } : { page: 'client', id: view.clientId };
   const b = $('#brand'); b.innerHTML = `${S.settings.logo ? `<img src="${S.settings.logo}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:10px;background:#fff;padding:3px">` : '<span class="logo">' + b.querySelector('.logo').innerHTML + '</span>'}<span>${esc(S.settings.name)}<small>${S.who ? 'Invité · ' + esc(S.who.name) : 'Espace projet'}</small></span>`;
   if (first || !document.activeElement || !['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) render();
 }
@@ -1657,7 +1703,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
