@@ -425,12 +425,13 @@ function navHTML() {
     return (isTeam() ? '' : `<button class="${route.page === 'client' ? 'on' : ''}" onclick="App.go('client','${c.id}')">Mon espace</button>`) + `<div class="nav-label">${isTeam() ? 'Projet' : 'Mes projets'}</div>` +
       ps.map(p => `<button class="sub ${route.id === p.id ? 'on' : ''}" onclick="App.go('project','${p.id}')"><span>${esc(p.title)}</span></button>`).join('');
   }
-  const parent = { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
+  const parent = route.page === 'project' && proj(route.id)?.archived ? 'archives' : { client: 'clients', project: 'projects', media: 'projects', invoice: 'invoices' }[route.page] || route.page;
+  const nArch = S.projects.filter(p => p.archived).length;
   const nA = alerts().filter(a => a.lvl !== 'info').length, nV = S.invoices.filter(i => i.status === 'a_verifier').length;
-  const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['settings', 'Mon profil']];
+  const items = [['dashboard', 'Tableau de bord', nA], ['clients', 'Clients'], ['projects', 'Projets'], ['invoices', 'Factures', nV], ['accounting', 'Comptabilité'], ['archives', 'Archives', nArch, 'n'], ['settings', 'Mon profil']];
   if (user) items.push(['plan', 'Mon offre']);
   if (profile?.is_admin) items.push(['admin', 'Administration']);
-  return items.map(([k, l, n]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge">${n}</span>` : ''}</button>`).join('');
+  return items.map(([k, l, n, tone]) => `<button class="${parent === k ? 'on' : ''}" onclick="App.go('${k}')"><span>${l}</span>${n ? `<span class="badge ${tone === 'n' ? 'neutral' : ''}">${n}</span>` : ''}</button>`).join('');
 }
 function render() {
   try { renderPage(); } catch (e) {
@@ -446,7 +447,7 @@ function renderPage() {
   $('#role').value = isOwner() ? 'me' : view.clientId;
   const r = route; let html;
   if (isOwner()) {
-    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin, plan: pPlan }[r.page] || pDashboard)(r.id);
+    html = ({ dashboard: pDashboard, clients: pClients, client: pClient, projects: pProjects, project: pProject, media: pMedia, invoices: pInvoices, invoice: pInvoice, accounting: pAccounting, settings: pSettings, admin: pAdmin, plan: pPlan, archives: pArchives }[r.page] || pDashboard)(r.id);
   } else {
     const cid = view.clientId; let ok = false;
     if (isTeam() && route.page !== 'media') route = { page: 'project', id: S.projects[0]?.id };
@@ -529,6 +530,24 @@ function pClient(id) {
       : `<p class="hint">${user ? 'Le lien sera créé à la prochaine synchronisation.' : 'Connectez-vous à votre compte en ligne (Réglages) pour donner à ce client un lien privé vers son espace.'}</p>${user ? '' : `<button class="btn sm" style="align-self:flex-start" onclick="App.go('settings')">Se connecter</button>`}`}</section>
   ${c.notes ? `<section class="card"><h2>Notes</h2><p class="hint" style="white-space:pre-wrap">${esc(c.notes)}</p></section>` : ''}</div>` : ''}`;
 }
+
+/* ----- Archives : projets réglés ou rangés ----- */
+let archQ = '';
+function pArchives() {
+  const q = archQ.trim().toLowerCase();
+  const all = S.projects.filter(p => p.archived).sort((a, b) => (b.archived || '').localeCompare(a.archived || ''));
+  const list = all.filter(p => !q || (p.title + ' ' + cname(client(p.clientId))).toLowerCase().includes(q));
+  const value = all.reduce((a, p) => a + (+p.amount || 0), 0), paid = all.filter(p => projSettled(p.id)).length;
+  const head = `<div class="ph"><div><h1>Archives</h1><div class="meta">Les projets terminés et réglés, rangés hors de ton suivi quotidien. Ils restent consultables et tu peux les ressortir à tout moment.</div></div></div>
+  <div class="kpis">${kpi('Projets archivés', all.length, `${paid} entièrement réglé${paid > 1 ? 's' : ''}`)}${kpi('Montant total', fmt(value), 'hors taxes', 'ok')}${kpi('Clients concernés', new Set(all.map(p => p.clientId)).size, 'avec au moins un projet archivé')}</div>`;
+  if (!all.length) return head + `<section class="card"><p class="empty">Aucun projet archivé pour l’instant.<br>Quand une facture est payée, clique sur <b>Marquer réglée</b> : ses projets peuvent être archivés en même temps. Tu peux aussi cliquer sur <b>Archiver</b> en haut de n’importe quel projet.</p></section>`;
+  return head + `<section class="card"><div class="card-h"><h2>${list.length} projet${list.length > 1 ? 's' : ''}</h2><input class="arch-search" type="search" placeholder="Rechercher un projet ou un client…" value="${esc(archQ)}" oninput="App.archSearch(this.value)" aria-label="Rechercher dans les archives"></div>
+  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Projet</th><th>Client</th><th>Archivé le</th><th class="num">Montant HT</th><th>Factures</th><th></th></tr></thead><tbody>${list.map(p => { const inv = S.invoices.filter(i => invHas(i, p.id));
+    return `<tr><td><a onclick="App.go('project','${p.id}')"><b>${esc(p.title)}</b></a><div class="muted small">${p.status === 'termine' ? 'Terminé' : 'En cours · ' + progress(p) + ' %'}</div></td><td>${esc(cname(client(p.clientId)))}</td><td>${fdate(p.archived)}</td><td class="num">${fmt(p.amount)}</td>
+    <td>${inv.length ? inv.map(i => `<a class="mono small" onclick="App.go('invoice','${i.id}')">${i.number}</a> ${invPill(i)}`).join('<br>') : '<span class="muted small">Aucune</span>'}</td>
+    <td><button class="btn sm" onclick="App.archiveProjects(['${p.id}'], false)">Sortir des archives</button></td></tr>`; }).join('')}</tbody></table></div>${list.length ? '' : '<p class="empty">Aucun résultat.</p>'}</section>`;
+}
+function archSearch(v) { archQ = v; const pos = $('.arch-search')?.selectionStart; render(); const el = $('.arch-search'); if (el) { el.focus(); el.setSelectionRange(pos, pos); } }
 
 /* ----- Projets ----- */
 function pProjects() {
@@ -1142,12 +1161,12 @@ function saveMarkPaid(id) {
   log(i.projectId, `Facture ${i.number} marquée réglée (${fmt(due)})`);
   closeModal();
   if (arch.length) archiveProjects(arch, true, true); else { save(); render(); }
-  toast(`${i.number} est réglée${arch.length ? ` · ${arch.length} projet${arch.length > 1 ? 's' : ''} archivé${arch.length > 1 ? 's' : ''}` : ''}`);
+  toast(`${i.number} est réglée${arch.length ? ` · ${arch.length} projet${arch.length > 1 ? 's' : ''} archivé${arch.length > 1 ? 's' : ''}` : ''}`, arch.length ? 'Voir les archives' : null, () => go('archives'));
 }
 function archiveProjects(ids, on, quiet) {
   ids.forEach(id => { const p = proj(id); if (!p) return; p.archived = on ? today() : null; log(id, on ? 'Projet archivé' : 'Projet sorti des archives'); });
   save(); render();
-  if (!quiet) toast(on ? (ids.length > 1 ? 'Projets archivés' : 'Projet archivé') : 'Projet sorti des archives');
+  if (!quiet) toast(on ? (ids.length > 1 ? 'Projets archivés' : 'Projet archivé') : 'Projet sorti des archives', on ? 'Voir les archives' : null, () => go('archives'));
 }
 function delPayment(iid, pid) { const i = invoice(iid); confirmBox('Supprimer ce paiement ?', 'La facture redeviendra due pour ce montant.', 'Supprimer', () => { i.payments = i.payments.filter(p => p.id !== pid); save(); render(); }); }
 function delInvoice(id) { const i = invoice(id); confirmBox(`Supprimer ${i.number} ?`, 'Cette action est définitive. Les paiements associés seront aussi retirés de la comptabilité.', 'Supprimer', () => { S.invoices = S.invoices.filter(x => x.id !== id); save(); go('invoices'); }); }
@@ -1743,7 +1762,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { markPaid, saveMarkPaid, archiveProjects, dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { archSearch, markPaid, saveMarkPaid, archiveProjects, dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
