@@ -1,6 +1,8 @@
 const App = (() => {
 /* ---------------- Stockage hors ligne (IndexedDB) ---------------- */
 const QS = new URLSearchParams(location.search);
+/* Version chargée, lue dans l'adresse du script (app.js?v=N) */
+const APP_V = +((document.currentScript?.src || '').match(/[?&]v=(\d+)/) || [])[1] || 0;
 const DEMO = QS.has('demo') || QS.has('capture');
 const DB = {
   db: null, mem: { kv: {}, files: {} },
@@ -942,6 +944,33 @@ function inviteModal(pid, personId, fresh) {
   `<button class="btn" onclick="App.editCollab('${pid}')">Ajouter une personne</button><button class="btn primary" onclick="App.closeModal()">Terminé</button>`, true);
 }
 
+/* ---------------- Mises à jour : version.json indique la dernière version publiée ---------------- */
+let updShown = 0;
+async function checkUpdate() {
+  if (!APP_V || !navigator.onLine) return;
+  try {
+    const v = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+    let later = 0; try { later = +sessionStorage.getItem('valideo-later') || 0; } catch (e) {}
+    if (+v.v > APP_V && +v.v !== updShown && +v.v !== later) showUpdate(v);
+  } catch (e) {}
+}
+function showUpdate(v) {
+  updShown = +v.v; $('#upd')?.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div class="upd glass" id="upd" role="dialog" aria-live="polite" aria-label="Mise à jour disponible">
+    <div class="upd-h"><span class="upd-dot"></span><b>Nouvelle version de Validéo</b></div>
+    ${(v.notes || []).length ? `<ul>${v.notes.slice(0, 5).map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : '<p class="muted small">Des améliorations sont disponibles.</p>'}
+    <p class="muted small">Tes données sont enregistrées : la mise à jour prend quelques secondes.</p>
+    <div class="row"><button class="btn primary" onclick="App.applyUpdate()">Mettre à jour</button><button class="btn ghost" onclick="App.laterUpdate(${+v.v})">Plus tard</button></div></div>`);
+}
+async function applyUpdate() {
+  const b = $('#upd .btn.primary'); if (b) { b.disabled = true; b.textContent = 'Mise à jour…'; }
+  try { if (typeof save === 'function') await Promise.resolve(save()); } catch (e) {}
+  try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch (e) {}
+  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch (e) {}
+  location.reload();
+}
+function laterUpdate(n) { try { sessionStorage.setItem('valideo-later', n); } catch (e) {} $('#upd')?.remove(); }
+
 /* ---------------- Facture en PDF ---------------- */
 /* Les liens mailto: et WhatsApp ne peuvent pas porter de pièce jointe : on fabrique un vrai PDF,
    partagé avec le menu de partage de l'appareil (qui, lui, sait joindre un fichier) ou téléchargé. */
@@ -1730,6 +1759,8 @@ async function startApp() {
 
 async function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 10 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
   if (!DEMO) Cloud.init();
   PORTAL_TOKEN = new URLSearchParams(location.search).get('portail');
   if (new URLSearchParams(location.search).has('capture')) document.body.classList.add('capture');
@@ -1762,7 +1793,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { archSearch, markPaid, saveMarkPaid, archiveProjects, dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { applyUpdate, laterUpdate, checkUpdate, archSearch, markPaid, saveMarkPaid, archiveProjects, dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
