@@ -151,7 +151,7 @@ function pPlan() {
   if (!user || !Cloud.ready) return '<section class="card"><h2>Mon offre</h2><p class="hint">Connecte-toi à ton compte pour gérer ton offre.</p></section>';
   if (!myPays) loadMyPays();
   const admin = !!profile?.is_admin, curKey = admin ? 'studio' : (planExpired() ? 'decouverte' : (profile?.plan || 'decouverte')), cur = PLANS[curKey];
-  const used = { projects: S.projects.filter(x => x.status !== 'termine').length, clients: S.clients.length };
+  const used = { projects: S.projects.filter(x => x.status !== 'termine' && !x.archived).length, clients: S.clients.length };
   const gauge = (k, l) => { const lim = admin ? Infinity : cur[k], pct = lim === Infinity ? 0 : Math.min(100, used[k] / lim * 100);
     return `<div class="kpi ${pct >= 100 ? 'warn' : ''}"><span class="k-l">${l}</span><span class="k-v">${used[k]}${lim === Infinity ? '' : ' / ' + lim}</span><span class="k-s">${lim === Infinity ? 'Illimité' : pct >= 100 ? 'Limite atteinte' : (lim - used[k]) + ' restant' + (lim - used[k] > 1 ? 's' : '')}</span>${lim === Infinity ? '' : `<div class="bar" style="margin-top:8px"><i style="width:${pct}%"></i></div>`}</div>`; };
   const card = k => { const p = PLANS[k], isCur = k === curKey && !admin, paid = k !== 'decouverte';
@@ -256,7 +256,7 @@ async function watchPayment(pid) {
 }
 function planAllows(kind) {
   if (!user || !profile || profile.is_admin) return true;
-  const p = myPlan(), n = kind === 'projects' ? S.projects.filter(x => x.status !== 'termine').length : S.clients.length;
+  const p = myPlan(), n = kind === 'projects' ? S.projects.filter(x => x.status !== 'termine' && !x.archived).length : S.clients.length;
   if (n < p[kind]) return true;
   toast(`L'offre ${p.name} est limitée à ${p[kind]} ${kind === 'projects' ? 'projets en cours' : 'clients'}. Passez à une offre supérieure pour continuer.`, 'Voir les offres', () => go('plan'));
   return false;
@@ -339,6 +339,7 @@ function invStatus(i) {
 const isSent = i => !['brouillon', 'a_verifier'].includes(i.status);
 const invPill = i => { const [l, k] = INV_LABEL[invStatus(i)]; return pill(k, l); };
 function deadlinePill(p) {
+  if (p.archived) return pill('', 'Archivé');
   if (p.status === 'termine') return pill('ok', 'Terminé');
   if (!p.deadline) return '';
   const d = diffDays(today(), p.deadline);
@@ -396,6 +397,7 @@ function alerts() {
     if ((st === 'envoyee' || st === 'partielle')) { const d = diffDays(t0, i.due); if (d <= 5) out.push({ lvl: 'info', title: `Échéance ${d === 0 ? "aujourd'hui" : 'dans ' + d + ' j'} · ${i.number}`, sub: `${cname(c)} · ${fmt(t.due)}`, act: [['Voir', `App.go('invoice','${i.id}')`]] }); }
   });
   S.projects.forEach(p => {
+    if (p.archived) return;
     if (p.status === 'termine' || !p.deadline) return;
     const d = diffDays(t0, p.deadline);
     if (d < 0) out.push({ lvl: 'bad', title: `Délai dépassé : ${p.title}`, sub: `Livraison prévue le ${fdate(p.deadline)} · ${progress(p)} %`, act: [['Ouvrir', `App.go('project','${p.id}')`]] });
@@ -488,7 +490,7 @@ function pDashboard() {
   const al = alerts(), t0 = today(), mo = t0.slice(0, 7);
   let toCollect = 0, late = 0, lateN = 0, month = 0;
   S.invoices.forEach(i => { if (!isSent(i)) return; const t = totals(i); toCollect += t.due; if (invStatus(i) === 'retard') { late += t.due; lateN++; } (i.payments || []).forEach(p => { if (p.date.slice(0, 7) === mo) month += +p.amount; }); });
-  const active = S.projects.filter(p => p.status !== 'termine').sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
+  const active = S.projects.filter(p => p.status !== 'termine' && !p.archived).sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9'));
   const recent = S.activity.slice(0, 6);
   const fresh = !DEMO && !S.clients.length && !S.projects.length;
   const away = !DEMO && S.away?.items?.length ? `<section class="card away" style="margin-bottom:18px"><div class="card-h"><h2>Pendant ton absence</h2><div class="row"><span class="muted small">${S.away.items.length} action${S.away.items.length > 1 ? 's' : ''} depuis le ${ftime(S.away.since)}</span><button class="btn sm" onclick="App.seenAway()">Tout est vu</button></div></div>${actList(S.away.items.slice(0, 12), true)}${S.away.items.length > 12 ? `<p class="hint">… et ${S.away.items.length - 12} autres dans l'historique des projets.</p>` : ''}</section>` : '';
@@ -530,13 +532,14 @@ function pClient(id) {
 
 /* ----- Projets ----- */
 function pProjects() {
-  const list = S.projects.filter(p => projFilter === 'all' || (projFilter === 'termine' ? p.status === 'termine' : p.status !== 'termine'));
+  const list = S.projects.filter(p => projFilter === 'all' || (projFilter === 'archive' ? p.archived : !p.archived && (projFilter === 'termine' ? p.status === 'termine' : p.status !== 'termine')));
+  const nArch = S.projects.filter(p => p.archived).length;
   const tab = (k, l) => `<button class="${projFilter === k ? 'on' : ''}" onclick="App.setFilter('proj','${k}')">${l}</button>`;
   const body = !list.length ? '<section class="card"><p class="empty">Aucun projet dans cette vue.</p></section>'
     : layout.projects === 'grid' ? `<div class="cgrid">${list.map(p => { const pr = progress(p); return `<button class="ccard" onclick="App.go('project','${p.id}')"><div class="card-h"><span class="muted small">${esc(cname(client(p.clientId)))}</span>${deadlinePill(p)}</div><div class="cn">${esc(p.title)}</div><div class="prog"><div class="bar ${pr === 100 ? 'done' : ''}"><i style="width:${pr}%"></i></div><span class="mono small">${pr}%</span></div><div class="cl"><span class="muted">Livraison</span><b>${fdate(p.deadline)}</b></div><div class="cl"><span class="muted">Montant HT</span><b class="mono">${fmt(p.amount)}</b></div></button>`; }).join('')}</div>`
     : `<section class="card"><div class="plist">${list.map(p => projRow(p)).join('')}</div></section>`;
   return `<div class="ph"><h1>Projets</h1><div class="row">${viewToggle('projects')}<button class="btn primary" onclick="App.editProject()">Nouveau projet</button></div></div>
-  <div class="tabs">${tab('en_cours', 'En cours')}${tab('termine', 'Terminés')}${tab('all', 'Tous')}</div>${body}`;
+  <div class="tabs">${tab('en_cours', 'En cours')}${tab('termine', 'Terminés')}${tab('archive', 'Archivés' + (nArch ? ' · ' + nArch : ''))}${tab('all', 'Tous')}</div>${body}`;
 }
 function pProject(id) {
   const p = proj(id); if (!p) return nf();
@@ -546,7 +549,7 @@ function pProject(id) {
   const hasFinal = S.invoices.some(i => i.projectId === p.id && i.kind === 'final') || projectBilled(p.id) >= (+p.amount || 0) - .005;
   return `<div class="crumbs">${own ? `<a onclick="App.go('projects')">Projets</a> / <a onclick="App.go('client','${c.id}')">${esc(cname(c))}</a>` : `<a onclick="App.go('client','${c.id}')">Mon espace</a>`} /</div>
   <div class="ph"><div><h1>${esc(p.title)}</h1><div class="meta"><span>${esc(cname(c))}</span>·<span>Livraison ${fdate(p.deadline)}</span>${canMoney() ? `·<span class="mono">${fmt(p.amount)} HT</span>` : ''}${deadlinePill(p)}</div></div>
-  ${own ? `<div class="row"><button class="btn ghost danger" onclick="App.delProject('${p.id}')">Supprimer</button><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
+  ${own ? `<div class="row"><button class="btn ghost danger" onclick="App.delProject('${p.id}')">Supprimer</button><button class="btn" onclick="App.archiveProjects(['${p.id}'], ${p.archived ? 'false' : 'true'})">${p.archived ? 'Sortir des archives' : 'Archiver'}</button><button class="btn" onclick="App.editProject('${p.id}')">Modifier</button><button class="btn primary" onclick="App.notify('${p.id}')">Prévenir les participants</button></div>` : ''}</div>
   ${stepper(p)}
   <div class="grid2 wide-left">
     <section class="card"><div class="card-h"><h2>Étapes</h2>${own ? `<button class="btn sm ghost" onclick="App.addStep('${p.id}')">Ajouter une étape</button>` : ''}</div>
@@ -663,7 +666,7 @@ function pInvoice(id) {
       <div class="disc-row"><label class="field"><span>Remise</span><input id="qd-val" type="number" min="0" step="any" value="${i.discount?.value || ''}" placeholder="0"></label><label class="field"><span>Type</span><select id="qd-type"><option value="pct" ${i.discount?.type !== 'fixed' ? 'selected' : ''}>%</option><option value="fixed" ${i.discount?.type === 'fixed' ? 'selected' : ''}>${esc(S.settings.currency)}</option></select></label><button class="btn" onclick="App.applyDiscount('${i.id}')">Appliquer</button></div>
       <div class="row"><button class="btn" onclick="App.editInvoice('${i.id}')">Modifier les lignes</button><button class="btn primary" onclick="App.validateInvoice('${i.id}')">Valider et envoyer</button></div></section>`;
     side += summary;
-    if (isSent(i)) side += `<section class="card"><h2>Actions</h2><div class="row">${t.due ? `<button class="btn primary" onclick="App.payModal('${i.id}')">Enregistrer un paiement</button><button class="btn" onclick="App.remind('${i.id}')">Relancer</button>` : ''}<button class="btn" onclick="App.sendInvoice('${i.id}')">Renvoyer</button><button class="btn" onclick="App.editInvoice('${i.id}')">Modifier</button></div></section>`;
+    if (isSent(i)) side += `<section class="card"><h2>Actions</h2><div class="row">${t.due ? `<button class="btn primary" onclick="App.markPaid('${i.id}')">Marquer réglée</button><button class="btn" onclick="App.payModal('${i.id}')">Paiement partiel</button><button class="btn" onclick="App.remind('${i.id}')">Relancer</button>` : ''}<button class="btn" onclick="App.sendInvoice('${i.id}')">Renvoyer</button><button class="btn" onclick="App.editInvoice('${i.id}')">Modifier</button></div></section>`;
     side += pays;
     side += `<section class="card"><h2>Apparence</h2><label class="field"><span>Modèle de cette facture</span><select onchange="App.setTpl('${i.id}',this.value)"><option value="">Modèle par défaut (${tplName(S.settings.template)})</option>${TEMPLATES.map(([k, l]) => `<option value="${k}" ${i.template === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button class="link" onclick="App.go('settings')">Logo, couleurs, signature et cachet</button></section>
     <button class="btn ghost danger" onclick="App.delInvoice('${i.id}')">Supprimer la facture</button>`;
@@ -706,7 +709,7 @@ function pAccounting() {
   <div class="kpis">${kpi('Encaissé ' + y, fmt(incY), `dont ${fmt(incM)} ce mois`, 'ok')}${kpi('Créances', fmt(recvT), `${recv.length} facture${recv.length > 1 ? 's' : ''} ouverte${recv.length > 1 ? 's' : ''}`, recvT ? 'warn' : '')}${kpi('Dont en retard', fmt(lateT), 'à relancer', lateT ? 'bad' : '')}${kpi('Dépenses ' + y, fmt(expY), `${S.expenses.length} ligne${S.expenses.length > 1 ? 's' : ''}`)}${kpi('Résultat ' + y, fmt(incY - expY), 'encaissé − dépenses')}</div>
   <section class="card" style="margin-bottom:16px"><div class="card-h"><h2>Encaissements et dépenses · 12 mois</h2><div class="legend"><span><i style="background:var(--accent)"></i>Encaissé</span><span><i style="background:var(--muted);opacity:.55"></i>Dépenses</span></div></div>${chartSVG()}</section>
   <div class="stack">
-  <section class="card"><h2>Créances et impayés</h2>${recv.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Facture</th><th>Client</th><th>Émise</th><th>Échéance</th><th>Retard</th><th class="num">Total</th><th class="num">Reste dû</th><th></th></tr></thead><tbody>${recv.map(i => { const t = totals(i), d = diffDays(i.due, today()); return `<tr><td class="mono"><a onclick="App.go('invoice','${i.id}')">${i.number}</a></td><td>${esc(cname(client(i.clientId)))}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td>${d > 0 ? pill('bad', d + ' j') : pill('', 'à échoir')}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" onclick="App.payModal('${i.id}')">Paiement</button><button class="btn sm ghost" onclick="App.remind('${i.id}')">Relancer</button></div></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune créance : tout est payé.</p>'}</section>
+  <section class="card"><h2>Créances et impayés</h2>${recv.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Facture</th><th>Client</th><th>Émise</th><th>Échéance</th><th>Retard</th><th class="num">Total</th><th class="num">Reste dû</th><th></th></tr></thead><tbody>${recv.map(i => { const t = totals(i), d = diffDays(i.due, today()); return `<tr><td class="mono"><a onclick="App.go('invoice','${i.id}')">${i.number}</a></td><td>${esc(cname(client(i.clientId)))}</td><td>${fdate(i.date)}</td><td>${fdate(i.due)}</td><td>${d > 0 ? pill('bad', d + ' j') : pill('', 'à échoir')}</td><td class="num">${fmt(t.ttc)}</td><td class="num">${fmt(t.due)}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm primary" onclick="App.markPaid('${i.id}')">Réglée</button><button class="btn sm" onclick="App.payModal('${i.id}')">Paiement</button><button class="btn sm ghost" onclick="App.remind('${i.id}')">Relancer</button></div></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">Aucune créance : tout est payé.</p>'}</section>
   <section class="card"><h2>Entrées (paiements reçus)</h2>${pays.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Client</th><th>Facture</th><th>Mode</th><th>Référence</th><th class="num">Montant</th><th>Preuve</th></tr></thead><tbody>${pays.map(p => `<tr><td>${fdate(p.date)}</td><td>${esc(cname(client(p.inv.clientId)))}</td><td class="mono"><a onclick="App.go('invoice','${p.inv.id}')">${p.inv.number}</a></td><td>${esc(p.method)}</td><td class="muted">${esc(p.ref || '—')}</td><td class="num">${fmt(p.amount)}</td><td>${p.proofId ? `<a class="link sm" data-proof="${p.proofId}" target="_blank" rel="noopener">${esc(p.proofName || 'Voir')}</a>` : '<span class="muted small">—</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucun paiement enregistré.</p>'}</section>
   <section class="card"><h2>Dépenses</h2>${S.expenses.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Montant</th><th></th></tr></thead><tbody>${[...S.expenses].sort((a, b) => b.date.localeCompare(a.date)).map(e => `<tr><td>${fdate(e.date)}</td><td>${esc(e.label)}</td><td>${pill('', e.category)}</td><td class="num">${fmt(e.amount)}</td><td><button class="icon-btn" aria-label="Supprimer" onclick="App.delExpense('${e.id}')">×</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">Aucune dépense.</p>'}</section></div>`;
 }
@@ -1119,7 +1122,32 @@ async function savePayment(id) {
   if (f) { p.proofId = uid(); p.proofName = f.name; await DB.put('files', p.proofId, f).catch(() => { delete p.proofId; }); }
   i.payments = i.payments || []; i.payments.push(p); if (!isSent(i)) i.status = 'envoyee';
   log(i.projectId, `Paiement de ${fmt(amount)} reçu pour ${i.number} (${p.method})`); save(); closeModal(); render();
-  toast(totals(i).due <= 0 ? `${i.number} est soldée` : `Paiement enregistré · reste ${fmt(totals(i).due)}`);
+  const settled = invProjects(i).filter(pid => proj(pid) && !proj(pid).archived && projSettled(pid));
+  toast(totals(i).due <= 0 ? `${i.number} est soldée` : `Paiement enregistré · reste ${fmt(totals(i).due)}`, settled.length ? `Archiver ${settled.length > 1 ? 'les projets' : 'le projet'}` : null, () => archiveProjects(settled, true));
+}
+/* Projets d'une facture entièrement réglés : toutes leurs factures envoyées sont payées */
+const projSettled = pid => { const inv = S.invoices.filter(i => invHas(i, pid)); return inv.length > 0 && inv.every(i => isSent(i) && totals(i).due <= 0.005); };
+function markPaid(id) {
+  const i = invoice(id), t = totals(i), ps = invProjects(i).map(proj).filter(p => p && !p.archived);
+  openModal(`Marquer ${i.number} comme réglée`, `<p class="hint">Le reste dû de <b class="mono">${fmt(t.due)}</b> est enregistré comme reçu : la facture passe en <b>Payée</b> et entre dans ta comptabilité.</p>
+  <div class="form"><label class="field"><span>Date de réception</span><input id="p-date" type="date" value="${today()}"></label>
+  <label class="field"><span>Mode de paiement</span><select id="p-method">${METHODS.map(m => `<option>${m}</option>`).join('')}</select></label></div>
+  ${ps.length ? `<div class="field"><span>Archiver les projets réglés</span>${ps.map(p => `<label class="check"><input type="checkbox" class="arch-p" value="${p.id}" checked> <span><b>${esc(p.title)}</b> · ${p.status === 'termine' ? 'terminé' : 'en cours ' + progress(p) + ' %'}</span></label>`).join('')}<small class="muted">Un projet archivé sort des projets en cours et du tableau de bord. Tu le retrouves dans Projets → Archivés.</small></div>` : ''}`,
+  `<button class="btn" onclick="App.closeModal()">Annuler</button><button class="btn primary" onclick="App.saveMarkPaid('${id}')">Marquer réglée</button>`);
+}
+function saveMarkPaid(id) {
+  const i = invoice(id), due = totals(i).due, arch = [...document.querySelectorAll('.arch-p:checked')].map(x => x.value);
+  if (due > 0) { i.payments = i.payments || []; i.payments.push({ id: uid(), date: val('p-date') || today(), amount: due, method: val('p-method'), ref: 'Marquée réglée' }); }
+  if (!isSent(i)) { i.status = 'envoyee'; i.sentAt = i.sentAt || today(); }
+  log(i.projectId, `Facture ${i.number} marquée réglée (${fmt(due)})`);
+  closeModal();
+  if (arch.length) archiveProjects(arch, true, true); else { save(); render(); }
+  toast(`${i.number} est réglée${arch.length ? ` · ${arch.length} projet${arch.length > 1 ? 's' : ''} archivé${arch.length > 1 ? 's' : ''}` : ''}`);
+}
+function archiveProjects(ids, on, quiet) {
+  ids.forEach(id => { const p = proj(id); if (!p) return; p.archived = on ? today() : null; log(id, on ? 'Projet archivé' : 'Projet sorti des archives'); });
+  save(); render();
+  if (!quiet) toast(on ? (ids.length > 1 ? 'Projets archivés' : 'Projet archivé') : 'Projet sorti des archives');
 }
 function delPayment(iid, pid) { const i = invoice(iid); confirmBox('Supprimer ce paiement ?', 'La facture redeviendra due pour ce montant.', 'Supprimer', () => { i.payments = i.payments.filter(p => p.id !== pid); save(); render(); }); }
 function delInvoice(id) { const i = invoice(id); confirmBox(`Supprimer ${i.number} ?`, 'Cette action est définitive. Les paiements associés seront aussi retirés de la comptabilité.', 'Supprimer', () => { S.invoices = S.invoices.filter(x => x.id !== id); save(); go('invoices'); }); }
@@ -1715,7 +1743,7 @@ async function init() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 init();
 
-return { dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
+return { markPaid, saveMarkPaid, archiveProjects, dlSet, pdfShare, pdfDownload, upgradeModal, payPick, startPayment, payResend, addProjLine, groupInvoice, groupTotal, saveGroupInvoice, seenAway: () => { S.away = null; save(); render(); }, addLink, saveLink, delLink, inviteModal, showAuth, authMode: setAuthMode, doLogin, doSignup, resend, google, sendReset, doReset, saveOnboarding, pwMeter, savePlan, reloadAdmin: () => { adminUsers = null; adminPays = null; render(); }, setLayout, approveMedia, copyText, sendPortal, signOut, syncNow: () => Cloud.sync(), go, setRole, setFilter, editClient, saveClient, delClient, editProject, saveProject, delProject, toggleStep, addStep, saveStep, renameStep, delStep, editCollab, saveCollab, delCollab, notify, prepLink, copyMsg, uploadMedia, newVersion, setVer, capture, pinAt, addComment, seek, resolve, delComment, delMedia,
   editInvoice, saveInvoice, applyDiscount, validateInvoice, sendInvoice, remind, payModal, savePayment, delPayment, delInvoice, setTpl, finalInvoice, depositInvoice, depositGo, depSet, clientLogo,
   editExpense, saveExpense, delExpense, exportCSV, setS, uploadLogo, uploadAvatar, uploadSig, saveSig, clearSig, exportData, importData, askReset, closeModal, doConfirm,
   d: (k, v) => { draft[k] = v; upd(); }, dd: (k, v) => { draft.discount[k] = v; upd(); }, dl: (i, k, v) => { draft.lines[i][k] = v; upd(); },
